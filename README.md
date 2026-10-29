@@ -28,20 +28,22 @@ Python nem Node.js e não há API paga.
 ## Funcionalidades
 
 - **Painel:** documentos cadastrados, prontos, processando e com erro (números reais da API); estado do
-  backend, do Ollama, dos dois modelos e do ChromaDB; atalhos para enviar PDF e conversar.
+  backend, do Ollama, dos dois modelos, do ChromaDB e do PostgreSQL; atalhos para enviar PDF e conversar.
 - **Documentos:** envio de um ou vários PDFs com barra de progresso; validação de extensão, conteúdo
   (`%PDF-`) e tamanho; processamento em segundo plano com a situação na tabela (na fila, processando,
   pronto, erro); nome, tamanho, páginas e data de envio; exclusão com confirmação, que remove o arquivo,
   os metadados e os vetores; reprocessamento; o mesmo PDF não entra duas vezes (SHA-256).
 - **Chat:** escolha de um ou mais documentos; resposta em streaming (aparece enquanto é gerada); botão
   parar; fontes de cada resposta (documento, página e trecho); tentar novamente em caso de erro; copiar
-  a resposta; histórico da conversa enquanto a página está aberta.
+  a resposta; conversas salvas no PostgreSQL (a conversa aberta fica no endereço `/chat?conversa=<id>`,
+  então recarregar a página continua nela); lista das conversas anteriores para reabrir; exclusão de
+  conversa com confirmação.
 - **RAG:** extração com PyMuPDF página a página, divisão com sobreposição, embeddings no Ollama, vetores
   no ChromaDB com documento e página nos metadados, busca só nos documentos escolhidos e resposta baseada
   nos trechos. Sem trechos relevantes, o sistema diz que não encontrou a informação em vez de inventar.
 - **Proteções:** o conteúdo dos PDFs é tratado como dado não confiável (instruções dentro do PDF não
-  mudam as regras do assistente), arquivos gravados com nome interno, CORS desligado, Ollama e ChromaDB
-  sem portas publicadas.
+  mudam as regras do assistente), arquivos gravados com nome interno, CORS desligado, Ollama, ChromaDB e
+  PostgreSQL sem portas publicadas.
 
 ## Arquitetura
 
@@ -49,7 +51,8 @@ Python nem Node.js e não há API paga.
 Navegador ──► frontend (nginx :8090) ──/api──► backend (FastAPI :8000) ──► ollama (:11434)
               React + Kole React                 │                            qwen3:4b, nomic-embed-text
                                                  ├──► chroma (:8000)  vetores dos trechos
-                                                 └──► /data           SQLite (metadados) e PDFs
+                                                 ├──► postgres (:5432) documentos, conversas, mensagens
+                                                 └──► /data           arquivos PDF
 ```
 
 | Serviço | Função | Porta no seu computador |
@@ -59,6 +62,7 @@ Navegador ──► frontend (nginx :8090) ──/api──► backend (FastAPI 
 | `ollama` | Modelo de chat e de embeddings | nenhuma |
 | `ollama-init` | Baixa os modelos que faltam e termina | nenhuma |
 | `chroma` | Banco vetorial persistente | nenhuma |
+| `postgres` | Metadados dos documentos, conversas e mensagens | nenhuma |
 
 Os containers conversam pelos nomes dos serviços na rede do Docker.
 
@@ -68,16 +72,20 @@ página → trechos de `CHUNK_SIZE` caracteres com `CHUNK_OVERLAP` de sobreposi�
 
 Fluxo de uma pergunta: embedding da pergunta (`search_query: ...`) → `RETRIEVAL_TOP_K` trechos mais
 próximos dos documentos escolhidos → contexto entre `<documentos>` → modelo de chat → eventos
-`sources`, `thinking`, `token`, `done` ou `error` (Server-Sent Events).
+`conversation`, `sources`, `thinking`, `token`, `done` ou `error` (Server-Sent Events). A pergunta é
+gravada na conversa antes do streaming e a resposta no fim (com as fontes, com o erro ou, se a pessoa
+parar, com o que já tinha chegado). O histórico enviado ao modelo são as últimas
+`HISTORY_MAX_MESSAGES` mensagens concluídas da conversa, lidas do banco.
 
 ## Tecnologias
 
 | Parte | Tecnologias |
 |---|---|
 | Frontend | React 19, TypeScript, Vite, React Router, [`@celke/kole-react`](https://www.npmjs.com/package/@celke/kole-react), nginx |
-| Backend | Python 3.13, FastAPI, Pydantic, PyMuPDF, LangChain Text Splitters, cliente oficial do Ollama, cliente do ChromaDB, SQLite |
+| Backend | Python 3.13, FastAPI, Pydantic, PyMuPDF, LangChain Text Splitters, cliente oficial do Ollama, cliente do ChromaDB, psycopg 3 |
 | IA | Ollama 0.40, `qwen3:4b` (chat), `nomic-embed-text` (embeddings) |
 | Banco vetorial | ChromaDB 1.5.9 |
+| Banco de dados | PostgreSQL 18.6 |
 | Testes | pytest, Ruff, Vitest, `tsc` |
 | Infraestrutura | Docker Compose |
 
@@ -101,12 +109,16 @@ git clone https://github.com/celkecursos/celke-ia-local-rascunho.git celke-ia-lo
 cd celke-ia-local
 ```
 
-**2. (Opcional) Criar o `.env`** para mudar porta, modelos ou limites. Sem ele, valem os padrões.
+**2. (Opcional) Criar o `.env`** para mudar porta, modelos ou limites. Sem ele, valem os padrões, e os
+scripts do passo 3 criam o arquivo com uma senha aleatória para o PostgreSQL (`POSTGRES_PASSWORD`).
 
 ```bash
 cp .env.example .env          # Linux e macOS
 copy .env.example .env        # Windows (cmd)
 ```
+
+Guarde o `.env`: o PostgreSQL grava a senha na primeira subida, e uma senha nova não abre o banco antigo
+(veja [Problemas comuns](#problemas-comuns)).
 
 **3. Subir tudo**
 
@@ -126,7 +138,8 @@ O script confere o Docker, constrói as imagens, sobe os serviços, espera o `ol
 modelos que faltam (cerca de 3 GB, só na primeira vez), confere a API e mostra o endereço. Pode rodar de
 novo quantas vezes quiser: o que já existe não é baixado de novo.
 
-Sem o script, o mesmo resultado em qualquer sistema:
+Sem o script, o mesmo resultado em qualquer sistema, desde que o `.env` tenha `POSTGRES_PASSWORD`
+preenchido (sem senha o `postgres` não sobe):
 
 ```bash
 docker compose up -d --build
@@ -158,6 +171,8 @@ docker compose start       # volta a rodar
    A primeira pergunta demora mais: o modelo é carregado na memória. Enquanto o modelo raciocina,
    aparece "Analisando os trechos dos documentos…"; depois a resposta chega aos poucos.
 4. Abra **fontes** abaixo da resposta para ver de qual documento e página veio cada trecho.
+5. A conversa é salva a cada pergunta. **Conversas** lista as anteriores (a mais recente primeiro),
+   **Nova conversa** começa outra e **Excluir** apaga a conversa aberta (os documentos continuam).
 
 Para testar sem o navegador:
 
@@ -166,6 +181,11 @@ curl -F "file=@meu-arquivo.pdf;type=application/pdf" http://localhost:8090/api/d
 curl http://localhost:8090/api/documents
 curl -N -X POST http://localhost:8090/api/chat -H "Content-Type: application/json" \
   -d '{"question": "Sobre o que é o documento?", "document_ids": ["<id>"]}'
+# o primeiro evento traz o id da conversa; a próxima pergunta continua nela:
+curl -N -X POST http://localhost:8090/api/chat -H "Content-Type: application/json" \
+  -d '{"question": "Resuma em uma frase.", "document_ids": ["<id>"], "conversation_id": "<id-da-conversa>"}'
+curl http://localhost:8090/api/conversations                     # conversas
+curl http://localhost:8090/api/conversations/<id-da-conversa>    # mensagens com as fontes
 ```
 
 ## Configuração e troca de modelos
@@ -184,7 +204,9 @@ execute `docker compose up -d` (ou o script de novo).
 | `EMBEDDING_DOCUMENT_PREFIX` / `EMBEDDING_QUERY_PREFIX` | `search_document: ` / `search_query: ` | Prefixos do nomic; vazios para outros modelos |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | `1000` / `200` | Tamanho e sobreposição dos trechos (caracteres) |
 | `RETRIEVAL_TOP_K` | `5` | Trechos enviados ao modelo por pergunta |
-| `HISTORY_MAX_MESSAGES` | `6` | Mensagens anteriores enviadas junto com a pergunta |
+| `HISTORY_MAX_MESSAGES` | `6` | Mensagens anteriores da conversa enviadas junto com a pergunta |
+| `POSTGRES_PASSWORD` | (vazio) | Senha do PostgreSQL, obrigatória; os scripts geram uma aleatória. Vale só na criação do volume |
+| `POSTGRES_DB` / `POSTGRES_USER` | `celke_ia_local` / `celke` | Nome do banco e do usuário (também só na criação do volume) |
 | `MAX_UPLOAD_MB` | `25` | Tamanho máximo de cada PDF |
 | `OLLAMA_KEEP_ALIVE` | `30m` | Tempo que o modelo fica na memória depois da última pergunta |
 
@@ -208,13 +230,14 @@ docker compose -f compose.yaml -f compose.gpu.yaml up -d
 Os testes rodam em containers; não é preciso Python nem Node instalados.
 
 ```bash
-# Backend: Ruff (lint e formatação) e testes unitários. Não usam o Ollama nem baixam modelos.
+# Backend: Ruff (lint e formatação) e testes unitários. Não usam o Ollama nem baixam modelos;
+# usam um PostgreSQL descartável em memória (serviço postgres-test), sem tocar no banco da aplicação.
 docker compose --profile test run --rm --build backend-tests
 
 # Frontend: verificação de tipos (tsc) e testes do Vitest
 docker compose --profile test run --rm --build frontend-tests
 
-# Integração: envio de PDF, indexação, pergunta ao modelo real, fontes e exclusão.
+# Integração: envio de PDF, indexação, pergunta ao modelo real, fontes, conversa gravada e exclusão.
 # Precisa da stack no ar com os modelos baixados.
 docker compose --profile test run --rm --build backend-tests pytest -m integration -v
 ```
@@ -223,9 +246,10 @@ docker compose --profile test run --rm --build backend-tests pytest -m integrati
 |---|---|
 | `tests/unit/test_pdf_and_chunker.py` | Extração por página, PDF sem texto, PDF corrompido, tamanho e sobreposição dos trechos |
 | `tests/unit/test_documents_api.py` | Envio, validação (tipo, conteúdo, tamanho, duplicado, nome com caminho), processamento, erros, reprocessamento, exclusão sem afetar outros documentos, estado dos serviços |
-| `tests/unit/test_chat.py` | Streaming, fontes, só os documentos escolhidos, sem contexto, histórico, raciocínio fora da resposta, erros do modelo |
+| `tests/unit/test_chat.py` | Streaming, fontes, só os documentos escolhidos, sem contexto, histórico da conversa, raciocínio fora da resposta, erros do modelo |
+| `tests/unit/test_conversations.py` | Conversa criada na primeira pergunta, mensagens e fontes gravadas, título, tentar de novo só após erro, resposta interrompida, exclusão, conversa depois de excluir o documento, importação do SQLite antigo |
 | `tests/unit/test_ollama_service.py` | Modelo ausente, conexão recusada, timeout, memória insuficiente, raciocínio separado |
-| `tests/integration/test_full_flow.py` | Fluxo completo com Ollama e ChromaDB reais |
+| `tests/integration/test_full_flow.py` | Fluxo completo com Ollama, ChromaDB e PostgreSQL reais |
 | `frontend/src/services/sse.test.ts` | Leitura do streaming (blocos partidos, `\r\n`) |
 
 ## Comandos úteis
@@ -235,6 +259,8 @@ docker compose ps                         # situação dos containers
 docker compose logs -f backend            # logs da API e do processamento dos PDFs
 docker compose logs -f ollama ollama-init # logs do Ollama e do download dos modelos
 docker compose logs --tail 100 frontend   # logs do nginx
+docker compose logs postgres              # logs do banco de dados
+docker compose exec postgres psql -U celke celke_ia_local   # console SQL (\dt lista as tabelas)
 docker compose exec ollama ollama list    # modelos instalados
 docker compose exec ollama ollama ps      # modelo carregado na memória agora
 docker compose restart backend            # reinicia só a API
@@ -248,15 +274,28 @@ reconstrução das imagens:
 
 | Volume | Conteúdo |
 |---|---|
-| `celke-ia-local_app-data` | PDFs enviados e o banco SQLite com os metadados |
+| `celke-ia-local_app-data` | PDFs enviados |
 | `celke-ia-local_chroma-data` | Vetores e trechos indexados |
+| `celke-ia-local_postgres-data` | Metadados dos documentos, conversas e mensagens |
 | `celke-ia-local_ollama-models` | Modelos baixados |
 
 ```bash
 docker compose down          # remove os containers e mantém os dados
-docker compose down -v       # remove os containers e APAGA documentos, vetores e modelos
-docker volume rm celke-ia-local_app-data celke-ia-local_chroma-data   # apaga só os documentos, mantém os modelos
+docker compose down -v       # remove os containers e APAGA documentos, vetores, conversas e modelos
+# apaga documentos e conversas, mantém os modelos (com os containers parados: docker compose down)
+docker volume rm celke-ia-local_app-data celke-ia-local_chroma-data celke-ia-local_postgres-data
 ```
+
+Cópia de segurança do banco e restauração:
+
+```bash
+docker compose exec -T postgres pg_dump -U celke celke_ia_local > backup.sql
+docker compose exec -T postgres psql -U celke celke_ia_local < backup.sql
+```
+
+**Vindo de uma versão com SQLite:** na primeira subida com o PostgreSQL, o backend importa os documentos
+do `/data/app.db` (os vetores no ChromaDB continuam valendo) e renomeia o arquivo para
+`app.db.importado`, que fica como cópia de segurança.
 
 ## Atualizar o projeto
 
@@ -303,6 +342,9 @@ o backend, `docker compose up -d --build backend`.
 | Porta 8090 ocupada | Defina outra no `.env` (`APP_PORT=8091`) |
 | Página não abre | `docker compose ps` (todos `healthy`?) e `docker compose logs backend frontend` |
 | Mudou o modelo de embeddings e os documentos sumiram do chat | Reprocesse cada documento em **Documentos** |
+| `postgres` não sobe: "superuser password is not specified" | Falta `POSTGRES_PASSWORD` no `.env`. Rode `./scripts/iniciar.sh` (cria a senha) ou preencha à mão |
+| Backend reinicia em loop com "password authentication failed" | O `.env` tem uma senha diferente da usada na criação do banco. Volte a senha antiga ou, para começar do zero, apague o volume `celke-ia-local_postgres-data` (perde documentos e conversas) |
+| "O banco de dados (PostgreSQL) não está respondendo" | `docker compose ps postgres` e `docker compose logs postgres` |
 
 ## Hardware e limitações
 
@@ -310,7 +352,7 @@ o backend, `docker compose up -d --build backend`.
   computadores mais simples são mais lentos. Com GPU NVIDIA, a resposta é várias vezes mais rápida.
 - O `qwen3:4b` raciocina antes de responder; a resposta começa depois de alguns segundos.
 - Não há OCR: PDFs digitalizados como imagem não são lidos.
-- O histórico da conversa fica só na página aberta (recarregar a página começa uma conversa nova).
+- Só a última resposta, quando dá erro, pode ser gerada de novo; as conversas não têm busca nem renomeação.
 - Um PDF é processado por vez; os demais aguardam na fila.
 
 ## Segurança
@@ -318,8 +360,9 @@ o backend, `docker compose up -d --build backend`.
 A aplicação foi feita para uso local, num computador pessoal. **Não a publique na internet como está:**
 não há login, e qualquer pessoa com acesso ao endereço pode enviar, ler e apagar documentos.
 
-- Só a porta do frontend é publicada, e apenas em `127.0.0.1`. O Ollama e o ChromaDB não têm porta no
-  host.
+- Só a porta do frontend é publicada, e apenas em `127.0.0.1`. O Ollama, o ChromaDB e o PostgreSQL não
+  têm porta no host.
+- A senha do PostgreSQL fica só no `.env` (fora do git), gerada aleatoriamente pelos scripts.
 - `APP_BIND=0.0.0.0` abre a aplicação para a rede local; use só em rede confiável.
 - Os arquivos são gravados com um identificador interno (o nome enviado nunca vira caminho), com limite
   de tamanho e verificação do conteúdo.
@@ -332,7 +375,8 @@ não há login, e qualquer pessoa com acesso ao endereço pode enviar, ler e apa
 
 ```
 backend/     API FastAPI: app/api (rotas), core (configuração, erros), schemas, services
-             (PDF, trechos, Ollama, documentos, RAG), repositories (SQLite, ChromaDB) e tests/
+             (PDF, trechos, Ollama, documentos, conversas, RAG), repositories (PostgreSQL,
+             ChromaDB) e tests/
 frontend/    React + Vite com o Kole React: layouts, pages, services (API e streaming), hooks; nginx
 scripts/     iniciar.sh (Linux e macOS) e iniciar.ps1 (Windows)
 docs/        Prompts para recriar o projeto do zero

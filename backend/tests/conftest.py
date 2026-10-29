@@ -6,7 +6,10 @@ from fastapi.testclient import TestClient
 from app.core.config import Settings
 from app.core.container import Container
 from app.main import create_app
+from app.repositories.conversation_repository import ConversationRepository
+from app.repositories.database import Database
 from app.repositories.document_repository import DocumentRepository
+from app.services.conversation_service import ConversationService
 from app.services.document_service import DocumentService
 from app.services.rag_service import RagService
 from tests.fakes import FakeModel, ImmediateExecutor, InMemoryVectorStore, make_pdf
@@ -29,6 +32,21 @@ class FakeOllamaStatus:
         return any(n == model or n == f"{model}:latest" for n in names)
 
 
+@pytest.fixture(scope="session")
+def database():
+    """PostgreSQL de teste (serviço postgres-test do compose, em memória). Uma conexão para a sessão toda."""
+    db = Database(Settings().database_conninfo)
+    db.create_schema()
+    yield db
+    db.close()
+
+
+@pytest.fixture(autouse=True)
+def clean_database(database):
+    with database.connection() as conn:
+        conn.execute("TRUNCATE documents, conversations, messages")
+
+
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     return Settings(data_dir=tmp_path / "data", chunk_size=200, chunk_overlap=40, retrieval_top_k=3, max_upload_mb=1)
@@ -45,16 +63,19 @@ def vectors() -> InMemoryVectorStore:
 
 
 @pytest.fixture
-def container(settings, model, vectors) -> Container:
-    repository = DocumentRepository(settings.database_path)
+def container(settings, database, model, vectors) -> Container:
+    repository = DocumentRepository(database)
+    conversations = ConversationRepository(database)
     executor = ImmediateExecutor()
     return Container(
         settings=settings,
+        database=database,
         repository=repository,
         vector_store=vectors,
         ollama=FakeOllamaStatus(),  # type: ignore[arg-type]
         documents=DocumentService(settings, repository, vectors, model, executor),
-        rag=RagService(settings, repository, vectors, model),
+        conversations=ConversationService(conversations),
+        rag=RagService(settings, repository, conversations, vectors, model),
         executor=executor,  # type: ignore[arg-type]
     )
 

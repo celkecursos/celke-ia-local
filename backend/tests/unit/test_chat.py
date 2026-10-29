@@ -18,8 +18,8 @@ def upload(client, path):
         return client.post("/api/documents", files={"file": (path.name, f, "application/pdf")}).json()["id"]
 
 
-def ask(client, question, ids, history=None):
-    return client.post("/api/chat", json={"question": question, "document_ids": ids, "history": history or []})
+def ask(client, question, ids, **extra):
+    return client.post("/api/chat", json={"question": question, "document_ids": ids, **extra})
 
 
 def test_chat_streams_sources_and_answer(client, sample_pdf, model):
@@ -30,8 +30,9 @@ def test_chat_streams_sources_and_answer(client, sample_pdf, model):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     events = parse_sse(response.text)
-    assert events[0][0] == "sources"
-    sources = events[0][1]
+    assert events[0][0] == "conversation"
+    assert events[1][0] == "sources"
+    sources = events[1][1]
     assert sources[0]["filename"] == "manual.pdf"
     assert sources[0]["page"] == 2
     assert "8000" in sources[0]["excerpt"]
@@ -61,7 +62,7 @@ def test_chat_only_searches_selected_documents(client, sample_pdf, tmp_path):
 
     events = parse_sse(ask(client, "Qual é a porta do ChromaDB?", [other]).text)
 
-    assert {s["filename"] for s in events[0][1]} <= {"receita.pdf"}
+    assert {s["filename"] for s in events[1][1]} <= {"receita.pdf"}
 
 
 def test_chat_without_relevant_context_does_not_call_model(client, sample_pdf, model):
@@ -69,19 +70,27 @@ def test_chat_without_relevant_context_does_not_call_model(client, sample_pdf, m
 
     events = parse_sse(ask(client, "xyzw", [document_id]).text)
 
-    assert events[0] == ("sources", [])
-    assert events[1] == ("token", {"text": NO_CONTEXT_ANSWER})
+    assert events[1] == ("sources", [])
+    assert events[2] == ("token", {"text": NO_CONTEXT_ANSWER})
     assert model.chat_calls == []
 
 
-def test_chat_sends_limited_history(client, sample_pdf, model, settings):
+def test_chat_sends_limited_history_from_the_conversation(client, sample_pdf, model, settings):
     document_id = upload(client, sample_pdf)
-    history = [{"role": "user" if i % 2 == 0 else "assistant", "content": f"msg {i}"} for i in range(10)]
+    conversation_id = None
+    for i in range(5):
+        events = parse_sse(
+            ask(client, f"Qual modelo é usado? {i}", [document_id], conversation_id=conversation_id).text
+        )
+        conversation_id = events[0][1]["id"]
 
-    ask(client, "Qual modelo é usado?", [document_id], history)
-
+    # 4 perguntas e 4 respostas antes da última; só as 6 mais recentes vão ao modelo
     sent = model.chat_calls[-1][1:-1]
-    assert [m["content"] for m in sent] == [f"msg {i}" for i in range(10 - settings.history_max_messages, 10)]
+    assert len(sent) == settings.history_max_messages
+    assert sent[0] == {"role": "user", "content": "Qual modelo é usado? 1"}
+    assert sent[-2] == {"role": "user", "content": "Qual modelo é usado? 3"}
+    assert sent[-1]["role"] == "assistant"
+    assert model.chat_calls[-1][-1]["content"].endswith("Pergunta: Qual modelo é usado? 4")
 
 
 def test_chat_reports_model_error_as_event(client, sample_pdf, model):

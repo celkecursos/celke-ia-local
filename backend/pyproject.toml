@@ -6,7 +6,7 @@ requires-python = ">=3.13"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "integration: usa o Ollama e o ChromaDB de verdade (rode com a stack no ar)",
+    "integration: usa o Ollama, o ChromaDB e o PostgreSQL de verdade (rode com a stack no ar)",
 ]
 addopts = "-m 'not integration'"
 

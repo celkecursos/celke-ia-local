@@ -2,10 +2,11 @@
 
 ## Contexto
 
-O `compose.yaml` já tem `ollama`, `ollama-init` e `chroma`, e os modelos `qwen3:4b` e
+O `compose.yaml` já tem `ollama`, `ollama-init`, `chroma` e `postgres`, e os modelos `qwen3:4b` e
 `nomic-embed-text` estão baixados. Nesta etapa você cria o backend em `backend/`: API FastAPI que recebe
-PDFs, extrai o texto, divide em trechos, gera embeddings no Ollama, grava no ChromaDB e responde
-perguntas com streaming. Os testes unitários não podem depender do Ollama.
+PDFs, extrai o texto, divide em trechos, gera embeddings no Ollama, grava no ChromaDB, responde
+perguntas com streaming e guarda documentos, conversas e mensagens no PostgreSQL. Os testes unitários
+não podem depender do Ollama.
 
 ## Dependências (`backend/requirements.txt`, versões fixas)
 
@@ -20,6 +21,8 @@ pymupdf==2.0
 chromadb-client==1.5.9      # mesma versão da imagem chromadb/chroma do compose
 langchain-text-splitters==1.1.3
 httpx==0.28.1
+psycopg[binary]==3.3.6
+psycopg-pool==3.3.3
 ```
 
 `requirements-dev.txt`: `-r requirements.txt`, `pytest==9.2.0`, `ruff==0.17.3`.
@@ -39,13 +42,17 @@ app/api/deps.py                   get_container(request) -> request.app.state.co
 app/api/status.py                 /health, /status, /status/ollama, /models
 app/api/documents.py              /documents...
 app/api/chat.py                   /chat/documents e /chat
-app/schemas/{documents,chat,status}.py
+app/api/conversations.py          /conversations
+app/schemas/{documents,chat,conversations,status}.py
 app/services/pdf_extractor.py     PyMuPDF
 app/services/chunker.py           RecursiveCharacterTextSplitter por página
 app/services/ollama_service.py    OllamaService e o protocolo LanguageModel
 app/services/document_service.py  envio, processamento, exclusão
-app/services/rag_service.py       recuperação, prompt e eventos SSE
-app/repositories/document_repository.py   SQLite
+app/services/conversation_service.py  listar, abrir e excluir conversas
+app/services/rag_service.py       recuperação, prompt, eventos SSE e gravação das mensagens
+app/repositories/database.py              pool de conexões e esquema do PostgreSQL
+app/repositories/document_repository.py   tabela documents
+app/repositories/conversation_repository.py  tabelas conversations e messages
 app/repositories/vector_store.py          protocolo VectorStore e ChromaVectorStore
 ```
 
@@ -58,9 +65,11 @@ português.
 `embedding_model="nomic-embed-text"`, `chat_num_ctx=8192`, `chat_temperature=0.2`,
 `chat_think: Literal["auto","true","false"]="auto"`, `embedding_document_prefix="search_document: "`,
 `embedding_query_prefix="search_query: "`, `embedding_batch_size=16`, `chroma_host="chroma"`,
-`chroma_port=8000`, `data_dir=Path("/data")`, `max_upload_mb=25`, `chunk_size=1000`,
-`chunk_overlap=200`, `retrieval_top_k=5`, `history_max_messages=6`, `cors_origins=""` (vazio = sem
-CORS). Propriedades: `documents_dir` (`data_dir/documents`), `database_path` (`data_dir/app.db`),
+`chroma_port=8000`, `postgres_host="postgres"`, `postgres_port=5432`, `postgres_db="celke_ia_local"`,
+`postgres_user="celke"`, `postgres_password=""`, `data_dir=Path("/data")`, `max_upload_mb=25`,
+`chunk_size=1000`, `chunk_overlap=200`, `retrieval_top_k=5`, `history_max_messages=6`,
+`cors_origins=""` (vazio = sem CORS). Propriedades: `documents_dir` (`data_dir/documents`),
+`database_conninfo` (montada com `psycopg.conninfo.make_conninfo`, `application_name="celke-ia-local"`),
 `max_upload_bytes` e `cors_origin_list`.
 
 ## Erros
@@ -68,21 +77,40 @@ CORS). Propriedades: `documents_dir` (`data_dir/documents`), `database_path` (`d
 `AppError(message, code, status_code)` e subclasses: `NotFoundError` 404 `nao_encontrado`,
 `ConflictError` 409 `conflito`, `InvalidFileError` 422 `arquivo_invalido`, `FileTooLargeError` 413
 `arquivo_grande_demais`, `OllamaUnavailableError` 503 `ollama_indisponivel`, `ModelNotInstalledError`
-503 `modelo_ausente`, `VectorStoreError` 503 `banco_vetorial_indisponivel`, `EmbeddingMismatchError`
-409 `embeddings_incompativeis`. Toda resposta de erro tem o formato
+503 `modelo_ausente`, `VectorStoreError` 503 `banco_vetorial_indisponivel`,
+`DatabaseUnavailableError` 503 `banco_de_dados_indisponivel`, `EmbeddingMismatchError` 409
+`embeddings_incompativeis`. Toda resposta de erro tem o formato
 `{"erro": {"codigo": "...", "mensagem": "..."}}`, inclusive a validação do Pydantic
 (`RequestValidationError` → 422 `dados_invalidos`, "Dados inválidos em <campo>: <msg>").
 
 ## Persistência
 
-- **SQLite** (`DocumentRepository`, uma conexão por operação porque o processamento roda em outra
-  thread): tabela `documents` com `id` (uuid4 hex), `filename`, `size_bytes`, `sha256` (único),
+- **PostgreSQL** (`Database` em `repositories/database.py`): `psycopg_pool.ConnectionPool`
+  (`min_size=1`, `max_size=10`, `row_factory=dict_row`), aberto no construtor esperando a primeira
+  conexão; `connection()` é um context manager com uma transação (commit no fim, rollback no erro) que
+  converte `PoolTimeout` e `psycopg.OperationalError` em `DatabaseUnavailableError` ("O banco de dados
+  (PostgreSQL) não está respondendo. Verifique: docker compose logs postgres"); `create_schema()`
+  (idempotente, `CREATE TABLE IF NOT EXISTS`, roda a cada inicialização), `ping()` (`SELECT 1`) e
+  `close()`. Todo SQL com parâmetros `%s`; nomes de coluna dinâmicos só com `psycopg.sql.Identifier`.
+- Tabela `documents`: `id` (uuid4 hex), `filename`, `size_bytes` (`BIGINT`), `sha256` (único),
   `page_count`, `chunk_count`, `status` (`pendente`, `processando`, `pronto`, `erro`),
-  `error_message`, `embedding_model`, `created_at`, `updated_at` (ISO, UTC). Métodos `create`, `get`,
-  `get_by_sha256`, `list_all` (mais recentes primeiro), `list_by_ids`, `update(**campos)`, `delete` e
-  `mark_interrupted()`, que na inicialização passa `pendente`/`processando` para `erro` com a mensagem
-  "O processamento foi interrompido porque o serviço reiniciou. Clique em reprocessar.". Não nomeie
-  métodos de `list` dentro da classe: o nome esconde o tipo `list` nas anotações.
+  `error_message`, `embedding_model`, `created_at` e `updated_at` (`TIMESTAMPTZ DEFAULT now()`).
+  `DocumentRepository(database)`: `create` (com `RETURNING *`), `get`, `get_by_sha256`, `list_all`
+  (mais recentes primeiro), `list_by_ids` (`id = ANY(%s)`), `update(**campos)` (só colunas conhecidas;
+  sempre atualiza `updated_at`), `delete` e `mark_interrupted()`, que na inicialização passa
+  `pendente`/`processando` para `erro` com a mensagem "O processamento foi interrompido porque o
+  serviço reiniciou. Clique em reprocessar.". Não nomeie métodos de `list` dentro da classe: o nome
+  esconde o tipo `list` nas anotações.
+- Tabela `conversations`: `id`, `title`, `document_ids TEXT[]` (sem chave estrangeira: a conversa
+  continua legível depois que um documento é excluído), `created_at`, `updated_at`, índice em
+  `updated_at DESC`. Tabela `messages`: `seq BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY` (a
+  ordem), `id` único, `conversation_id` com `REFERENCES conversations ON DELETE CASCADE`, `role`
+  (`user`/`assistant`, com `CHECK`), `content`, `state` (`concluida`/`erro`, com `CHECK`),
+  `error_message`, `sources JSONB` e `created_at`, índice em `(conversation_id, seq)`.
+  `ConversationRepository(database)`: `create(title, document_ids)`, `get`, `list_all` (mais recente
+  primeiro), `update_documents`, `delete` (devolve se apagou), `messages` (por `seq`),
+  `add_message` (grava as fontes com `Jsonb` e atualiza o `updated_at` da conversa) e
+  `delete_message`.
 - **ChromaDB** (`ChromaVectorStore` com `chromadb.HttpClient`): coleção `chunks-<modelo>` (slug do
   nome do modelo, até 63 caracteres), criada com `embedding_function=None` (os vetores vêm do backend)
   e `metadata={"hnsw:space": "cosine", "embedding_model": <modelo>}`. Na primeira gravação, salve a
@@ -147,10 +175,19 @@ CORS). Propriedades: `documents_dir` (`data_dir/documents`), `database_path` (`d
   confiável e ignorar instruções que apareçam neles; citar as fontes como `[n]`; ser objetivo.
 - Contexto: `<documentos>` com um `<trecho n="1" documento="..." pagina="...">` por resultado,
   removendo `</documentos>` do texto dos trechos.
-- Mensagens: sistema, as últimas `history_max_messages` do histórico e, por fim, o contexto mais
-  "Pergunta: ...".
-- `validate(request)` antes do streaming: documento inexistente ou não pronto → 422 com o nome.
-- `stream_answer(request)` gera Server-Sent Events (`event: <nome>\ndata: <json>\n\n`):
+- Mensagens: sistema, as últimas `history_max_messages` do histórico da conversa e, por fim, o
+  contexto mais "Pergunta: ...". O histórico vem do banco (mensagens `concluida` com texto), nunca do
+  navegador.
+- `start(request) -> ChatTurn` antes do streaming, para os erros simples virarem resposta HTTP comum:
+  documento inexistente ou não pronto → 422 com o nome. Sem `conversation_id`, cria a conversa (título
+  = a pergunta com os espaços normalizados, até 80 caracteres, com "…" quando cortada) e grava a
+  pergunta. Com `conversation_id`: conversa inexistente → 404 "Conversa não encontrada."; grava a
+  pergunta e atualiza os `document_ids` da conversa. Com `retry`: exige a conversa (sem ela, 422),
+  apaga a última resposta se ela for um erro e reusa a última pergunta gravada, sem gravá-la de novo;
+  se a última mensagem não for uma pergunta sem resposta, 409 "Só a última resposta, quando termina
+  em erro, pode ser gerada de novo.".
+- `stream_answer(turn)` gera Server-Sent Events (`event: <nome>\ndata: <json>\n\n`):
+  0. `conversation`: `{"id", "title"}` da conversa em que a pergunta entrou;
   1. `sources`: lista com `document_id`, `filename`, `page`, `excerpt` e `score` (1 − distância);
   2. sem trechos → um `token` com "Não encontrei nos documentos selecionados informações suficientes
      para responder a essa pergunta." e `done`, **sem chamar o modelo**;
@@ -159,12 +196,17 @@ CORS). Propriedades: `documents_dir` (`data_dir/documents`), `database_path` (`d
   4. um `token` (`{"text": ...}`) por pedaço da resposta;
   5. `done`, ou `error` (`{"codigo", "mensagem"}`) se algo falhar durante o streaming.
 
+  A resposta é gravada como mensagem `assistant` com as fontes **antes** do `done` (quem recarregar a
+  página logo depois já a encontra); com `state="erro"` e `error_message` quando falhar; e, num
+  `finally`, com o texto que já tinha chegado (ou "Resposta interrompida.") quando o navegador fechar a
+  conexão no meio. Falha ao gravar a resposta só vai para o log.
+
 ## API (prefixo `/api`, Swagger em `/api/docs`, OpenAPI em `/api/openapi.json`)
 
 | Método e rota | Resposta |
 |---|---|
 | `GET /health` | `{"status": "ok"}` |
-| `GET /status` | backend, ollama (`online`, `chat_model` e `embedding_model` com `name` e `installed`, `error`) e `vector_store` |
+| `GET /status` | backend, ollama (`online`, `chat_model` e `embedding_model` com `name` e `installed`, `error`), `vector_store` e `database` |
 | `GET /status/ollama` | só a parte do Ollama |
 | `GET /models` | modelos instalados (`name`, `size_bytes`) |
 | `GET /documents` | `{"items": [...]}` |
@@ -174,11 +216,15 @@ CORS). Propriedades: `documents_dir` (`data_dir/documents`), `database_path` (`d
 | `POST /documents/{id}/reprocess` | 202 |
 | `DELETE /documents/{id}` | 204 |
 | `GET /chat/documents` | documentos prontos para o chat |
-| `POST /chat` | `{"question" (1–4000), "document_ids" (1–50), "history" (até 20, `role` user/assistant)}` → `text/event-stream` com `Cache-Control: no-cache` e `X-Accel-Buffering: no` |
+| `POST /chat` | `{"question" (1–4000), "document_ids" (1–50), "conversation_id" (opcional), "retry" (padrão false)}` → `text/event-stream` com `Cache-Control: no-cache` e `X-Accel-Buffering: no` |
+| `GET /conversations` | `{"items": [...]}` com `id`, `title`, `document_ids`, `created_at`, `updated_at` |
+| `GET /conversations/{id}` | a conversa com `messages` (`id`, `role`, `content`, `state`, `error_message`, `sources`, `created_at`) |
+| `DELETE /conversations/{id}` | 204; apaga as mensagens e mantém os documentos |
 
 Use `summary`, `tags` em português e `response_model` em todas as rotas. Na inicialização (`lifespan`),
-crie o container e chame `mark_interrupted()`; no encerramento, `executor.shutdown(wait=False,
-cancel_futures=True)`. Só adicione o `CORSMiddleware` se `cors_origins` tiver valor.
+crie o container, chame `database.create_schema()` e `mark_interrupted()`; no encerramento,
+`executor.shutdown(wait=False, cancel_futures=True)` e, se o container foi criado ali (não veio dos
+testes), `database.close()`. Só adicione o `CORSMiddleware` se `cors_origins` tiver valor.
 
 ## Docker (`backend/Dockerfile`)
 
@@ -195,9 +241,16 @@ Base `python:3.13-slim`, usuário `app` (uid 1000) dono de `/app` e `/data`. Est
 No `compose.yaml`, acrescente o serviço `backend` (build `./backend`, target `runtime`), com todas as
 variáveis do `.env.example` repassadas com padrão (`CHAT_MODEL: ${CHAT_MODEL:-qwen3:4b}`…; os prefixos
 entre aspas, porque têm `: `), `OLLAMA_URL: http://ollama:11434`, `CHROMA_HOST: chroma`,
-`DATA_DIR: /data`, volume `app-data:/data`, `depends_on` com `chroma` e `ollama` saudáveis, sem
-`ports`. Acrescente também o serviço de testes `backend-tests` (`profiles: [test]`, target `test`,
-`DATA_DIR: /tmp/data`, `INTEGRATION_API_URL: http://backend:8000/api`).
+`POSTGRES_HOST: postgres`, `POSTGRES_PORT: 5432`, `POSTGRES_DB`/`POSTGRES_USER` com padrão,
+`POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}` (sem padrão), `DATA_DIR: /data`, volume `app-data:/data`
+(os PDFs), `depends_on` com `postgres`, `chroma` e `ollama` saudáveis, sem `ports`. Acrescente também:
+
+- `postgres-test` (`profiles: [test]`, `postgres:18.6-alpine`, `POSTGRES_DB: celke_ia_local_test`,
+  `POSTGRES_USER: celke`, `POSTGRES_HOST_AUTH_METHOD: trust`, `tmpfs: /var/lib/postgresql`,
+  healthcheck com `pg_isready`): banco descartável dos testes, sem senha e sem volume;
+- `backend-tests` (`profiles: [test]`, target `test`, `DATA_DIR: /tmp/data`,
+  `POSTGRES_HOST: postgres-test`, `POSTGRES_DB: celke_ia_local_test`, `POSTGRES_USER: celke`,
+  `INTEGRATION_API_URL: http://backend:8000/api`, `depends_on` com `postgres-test` saudável).
 
 ## Testes unitários (sem Ollama)
 
@@ -205,7 +258,9 @@ entre aspas, porque têm `: `), `OLLAMA_URL: http://ollama:11434`, `CHROMA_HOST:
 dimensões, ignorando o prefixo; `chat_stream` devolve dois pedaços `thinking` e a resposta palavra por
 palavra; erros configuráveis), `InMemoryVectorStore` (similaridade de cosseno, filtro por documento,
 falha configurável), `ImmediateExecutor` (roda a tarefa na hora) e `make_pdf(path, pages)` com
-PyMuPDF. `conftest.py` monta o `Container` com esses dublês, um dublê das rotas de estado do Ollama e
+PyMuPDF. `conftest.py` tem um `Database` de sessão (o `postgres-test`, com `create_schema()`), um
+fixture `autouse` que faz `TRUNCATE documents, conversations, messages` antes de cada teste, e monta o
+`Container` com esse banco, os dublês, um dublê das rotas de estado do Ollama e
 `TestClient(create_app(settings, container))`, com `chunk_size=200`, `chunk_overlap=40`,
 `retrieval_top_k=3` e `max_upload_mb=1`.
 
@@ -214,11 +269,17 @@ trechos; envio com indexação; nome com `../` gravado como id; duplicado (409);
 errada (422); grande demais (413, sem sobrar arquivo); PDF sem texto termina em erro com "OCR"; falha
 de embeddings e reprocessamento; exclusão que mantém os outros documentos e os vetores deles; exclusão
 com ChromaDB fora do ar (503, documento continua); lista e estatísticas; 404; documento interrompido
-marcado na inicialização; `/status` e `/status/ollama` (offline e modelo ausente); `/models`;
-streaming com `sources` primeiro, página certa, `thinking` uma vez, raciocínio fora da resposta e
-`done`; prefixo `search_query: `; contexto em `<documentos>` e regra contra instruções; busca só nos
-documentos escolhidos; sem contexto sem chamar o modelo; histórico limitado; erro do modelo como
-evento `error`; documento não pronto (422); validação (422 `dados_invalidos`); `/chat/documents` só com
+marcado na inicialização; `/status` (com `database`) e `/status/ollama` (offline e modelo ausente);
+`/models`; streaming com `conversation` e `sources` primeiro, página certa, `thinking` uma vez,
+raciocínio fora da resposta e `done`; prefixo `search_query: `; contexto em `<documentos>` e regra
+contra instruções; busca só nos documentos escolhidos; sem contexto sem chamar o modelo; histórico da
+conversa limitado a `history_max_messages`; erro do modelo como evento `error`; conversa criada na
+primeira pergunta com pergunta, resposta e fontes gravadas; título curto; próxima pergunta na mesma
+conversa; erro gravado e `retry` que o substitui sem repetir a pergunta; `retry` recusado depois de
+uma resposta boa (409) e sem conversa (422); conversa inexistente (404); pergunta recusada não cria
+conversa; exclusão da conversa mantém os documentos; conversa continua depois de excluir o
+documento; resposta interrompida (`close()` no gerador) grava o que chegou ou "Resposta
+interrompida."; documento não pronto (422); validação (422 `dados_invalidos`); `/chat/documents` só com
 prontos; `needs_reindex`; tradução dos erros do Ollama (404, conexão, timeout, memória); `think`
 automático pela capacidade (consultada uma vez) e forçado; nome da coleção por modelo.
 
@@ -231,5 +292,5 @@ docker compose ps backend                                               # health
 docker compose exec backend python -c "import urllib.request,json; print(json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/status')))"
 ```
 
-O `/api/status` precisa mostrar `ollama.online`, os dois modelos `installed: true` e
-`vector_store.online`.
+O `/api/status` precisa mostrar `ollama.online`, os dois modelos `installed: true`,
+`vector_store.online` e `database.online`.

@@ -58,20 +58,40 @@
   overflow-wrap: anywhere;
 }
 
-/* O chat ocupa a altura da janela: a Conversa preenche o espaço do contêiner. */
+/*
+ * O chat ocupa exatamente a área de conteúdo da Estrutura: cabeçalho e
+ * documentos ficam sempre visíveis e só a Conversa rola.
+ */
+.lp-content:has(> .lp-content-inner > .app-chat) {
+  display: flex;
+  flex-direction: column;
+}
+
+.lp-content-inner:has(> .app-chat) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .app-chat {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  min-height: calc(100dvh - 9rem);
 }
 
-.app-chat-conversa {
+.app-chat > * {
+  flex: none;
+}
+
+.app-chat > .app-chat-conversa {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 24rem;
-  height: calc(100dvh - 20rem);
+  /* janela muito baixa: a página volta a rolar em vez de esmagar a conversa */
+  min-height: 16rem;
   border: var(--hairline) solid var(--border);
   border-radius: var(--r-card);
   background: var(--surface);

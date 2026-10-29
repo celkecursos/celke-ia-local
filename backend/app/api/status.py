@@ -47,7 +47,14 @@ def system_status(c: ContainerDep) -> SystemStatus:
         vector = ServiceStatus(online=True)
     except AppError as exc:
         vector = ServiceStatus(online=False, error=exc.message)
-    return SystemStatus(backend=ServiceStatus(online=True), ollama=_ollama_status(c), vector_store=vector)
+    try:
+        c.database.ping()
+        database = ServiceStatus(online=True)
+    except AppError as exc:
+        database = ServiceStatus(online=False, error=exc.message)
+    return SystemStatus(
+        backend=ServiceStatus(online=True), ollama=_ollama_status(c), vector_store=vector, database=database
+    )
 
 
 @router.get("/models", response_model=ModelList, summary="Modelos instalados no Ollama")

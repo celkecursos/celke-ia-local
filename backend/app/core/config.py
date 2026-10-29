@@ -2,6 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from psycopg.conninfo import make_conninfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +28,13 @@ class Settings(BaseSettings):
     chroma_host: str = "chroma"
     chroma_port: int = 8000
 
+    # PostgreSQL: metadados dos documentos, conversas e mensagens.
+    postgres_host: str = "postgres"
+    postgres_port: int = 5432
+    postgres_db: str = "celke_ia_local"
+    postgres_user: str = "celke"
+    postgres_password: str = ""
+
     data_dir: Path = Path("/data")
     max_upload_mb: int = 25
     chunk_size: int = 1000
@@ -42,7 +50,19 @@ class Settings(BaseSettings):
         return self.data_dir / "documents"
 
     @property
-    def database_path(self) -> Path:
+    def database_conninfo(self) -> str:
+        return make_conninfo(
+            host=self.postgres_host,
+            port=self.postgres_port,
+            dbname=self.postgres_db,
+            user=self.postgres_user,
+            password=self.postgres_password,
+            application_name="celke-ia-local",
+        )
+
+    @property
+    def legacy_sqlite_path(self) -> Path:
+        """Banco SQLite das versões anteriores: importado uma vez para o PostgreSQL."""
         return self.data_dir / "app.db"
 
     @property

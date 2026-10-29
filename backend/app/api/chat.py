@@ -26,16 +26,18 @@ def chat_documents(c: ContainerDep) -> ChatDocumentList:
     "",
     summary="Pergunta sobre os documentos (streaming)",
     description=(
-        "Resposta em Server-Sent Events. Eventos: `sources` (lista de trechos recuperados), "
-        "`thinking` (o modelo está raciocinando; enviado uma vez), `token` (`{text}`, pedaço da resposta), `done` (fim) e `error` (`{codigo, mensagem}`)."
+        "Resposta em Server-Sent Events. Eventos: `conversation` (`{id, title}`, a conversa em que a pergunta "
+        "foi gravada), `sources` (lista de trechos recuperados), `thinking` (o modelo está raciocinando; enviado "
+        "uma vez), `token` (`{text}`, pedaço da resposta), `done` (fim) e `error` (`{codigo, mensagem}`). "
+        "A pergunta e a resposta ficam gravadas na conversa."
     ),
     response_class=StreamingResponse,
     responses={200: {"content": {"text/event-stream": {}}}},
 )
 def chat(request: ChatRequest, c: ContainerDep) -> StreamingResponse:
-    c.rag.validate(request)
+    turn = c.rag.start(request)
     return StreamingResponse(
-        c.rag.stream_answer(request),
+        c.rag.stream_answer(turn),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

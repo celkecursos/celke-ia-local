@@ -1,4 +1,4 @@
-"""Fluxo completo com o Ollama e o ChromaDB de verdade.
+"""Fluxo completo com o Ollama, o ChromaDB e o PostgreSQL de verdade.
 
 Rode com a stack no ar e os modelos baixados:
     docker compose --profile test run --rm backend-tests pytest -m integration
@@ -57,10 +57,17 @@ def test_upload_ask_and_delete(api, tmp_path):
                 events.append((lines["event"], json.loads(lines["data"])))
 
         assert events[-1][0] == "done", events[-1]
-        sources = events[0][1]
+        assert events[0][0] == "conversation"
+        conversation_id = events[0][1]["id"]
+        sources = events[1][1]
         assert any(s["page"] == 2 for s in sources)
-        answer = "".join(d["text"] for name, d in events if name == "token").lower()
-        assert "girassol" in answer
+        answer = "".join(d["text"] for name, d in events if name == "token")
+        assert "girassol" in answer.lower()
+
+        messages = api.get(f"/conversations/{conversation_id}").json()["messages"]
+        assert [m["role"] for m in messages] == ["user", "assistant"]
+        assert messages[1]["content"] == answer
+        assert api.delete(f"/conversations/{conversation_id}").status_code == 204
     finally:
         assert api.delete(f"/documents/{document_id}").status_code == 204
     assert api.get(f"/documents/{document_id}").status_code == 404
