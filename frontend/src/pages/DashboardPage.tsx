@@ -12,7 +12,7 @@ export function DashboardPage() {
   const modelsMissing = s?.ollama.online && !(s.ollama.chat_model.installed && s.ollama.embedding_model.installed);
 
   return (
-    <>
+    <div className="app-pagina">
       <CabecalhoPagina
         titulo="Painel"
         icone="house"
@@ -67,7 +67,7 @@ export function DashboardPage() {
         />
       </Indicadores>
 
-      <Card titulo="Serviços" subtitulo="Atualizado a cada 10 segundos" className="app-servicos">
+      <Card titulo="Serviços" subtitulo="Atualizado a cada 10 segundos">
         {status.error ? (
           <Alerta severidade="err" titulo="Backend indisponível" mensagem={status.error.message} />
         ) : (
@@ -102,6 +102,6 @@ export function DashboardPage() {
           </ul>
         )}
       </Card>
-    </>
+    </div>
   );
 }

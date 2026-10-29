@@ -69,6 +69,10 @@ src/pages/DashboardPage.tsx, DocumentsPage.tsx, ChatPage.tsx, NotFoundPage.tsx
 src/styles.css             ajustes de layout só com as variáveis do tema (nada de cor fixa)
 ```
 
+O conteúdo do Painel e de Documentos fica num `<div className="app-pagina">` (`display: flex`,
+`flex-direction: column`, `gap: 1rem`): os componentes do Kole não têm margem externa, e assim o espaço
+entre cabeçalho, alertas, indicadores e cards é sempre o mesmo. O contêiner do Chat usa o mesmo `gap`.
+
 ## Serviços
 
 - `ApiError(message, status, code)`; a mensagem vem de `erro.mensagem` do backend; 502/504 →

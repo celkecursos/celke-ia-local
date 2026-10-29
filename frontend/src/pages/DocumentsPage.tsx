@@ -119,7 +119,7 @@ export function DocumentsPage() {
   ];
 
   return (
-    <>
+    <div className="app-pagina">
       <CabecalhoPagina titulo="Documentos" icone="file-text" trilha>
         Envie PDFs com texto selecionável. Cada arquivo é dividido em trechos e indexado para o chat.
       </CabecalhoPagina>
@@ -186,6 +186,6 @@ export function DocumentsPage() {
           )}
         />
       </Card>
-    </>
+    </div>
   );
 }
