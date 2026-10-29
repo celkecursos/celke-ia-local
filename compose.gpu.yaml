@@ -1,0 +1,11 @@
+# GPU NVIDIA no Linux ou no Windows (WSL2). Requer o NVIDIA Container Toolkit.
+# docker compose -f compose.yaml -f compose.gpu.yaml up -d
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

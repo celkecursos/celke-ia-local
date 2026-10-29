@@ -1,0 +1,126 @@
+# Celke IA Local: frontend (nginx + React), backend (FastAPI), Ollama e ChromaDB.
+# Subir: docker compose up -d --build   (ou scripts/iniciar.sh / scripts/iniciar.ps1)
+# Valores padrão abaixo; para mudar, copie .env.example para .env.
+name: celke-ia-local
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      target: runtime
+      args:
+        VITE_MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+    environment:
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+    # Só no próprio computador. Para abrir na rede local, troque 127.0.0.1 por 0.0.0.0 (ver README).
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8090}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-300}
+      CHAT_MODEL: ${CHAT_MODEL:-qwen3:4b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      CHAT_NUM_CTX: ${CHAT_NUM_CTX:-8192}
+      CHAT_TEMPERATURE: ${CHAT_TEMPERATURE:-0.2}
+      CHAT_THINK: ${CHAT_THINK:-auto}
+      EMBEDDING_DOCUMENT_PREFIX: "${EMBEDDING_DOCUMENT_PREFIX-search_document: }"
+      EMBEDDING_QUERY_PREFIX: "${EMBEDDING_QUERY_PREFIX-search_query: }"
+      CHROMA_HOST: chroma
+      CHROMA_PORT: 8000
+      DATA_DIR: /data
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+      CHUNK_SIZE: ${CHUNK_SIZE:-1000}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-200}
+      RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K:-5}
+      HISTORY_MAX_MESSAGES: ${HISTORY_MAX_MESSAGES:-6}
+    volumes:
+      - app-data:/data
+    depends_on:
+      chroma:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:0.40.13
+    volumes:
+      - ollama-models:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+    restart: unless-stopped
+
+  # Baixa só os modelos que faltam e termina. Os modelos ficam no volume ollama-models.
+  ollama-init:
+    image: ollama/ollama:0.40.13
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      CHAT_MODEL: ${CHAT_MODEL:-qwen3:4b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for model in "$$EMBEDDING_MODEL" "$$CHAT_MODEL"; do
+          if ollama show "$$model" > /dev/null 2>&1; then
+            echo "Modelo $$model já instalado."
+          else
+            echo "Baixando $$model (só na primeira vez)..."
+            ollama pull "$$model" || exit 1
+          fi
+        done
+        echo "Modelos prontos."
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  chroma:
+    image: chromadb/chroma:1.5.9
+    environment:
+      ANONYMIZED_TELEMETRY: "FALSE"
+    volumes:
+      - chroma-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000 && printf \"GET /api/v2/heartbeat HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q 200 <&3'"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 10
+    restart: unless-stopped
+
+  # docker compose --profile test run --rm backend-tests
+  backend-tests:
+    profiles: [test]
+    build:
+      context: ./backend
+      target: test
+    environment:
+      DATA_DIR: /tmp/data
+      INTEGRATION_API_URL: http://backend:8000/api
+
+  # docker compose --profile test run --rm frontend-tests
+  frontend-tests:
+    profiles: [test]
+    build:
+      context: ./frontend
+      target: test
+
+volumes:
+  app-data:
+  ollama-models:
+  chroma-data:
