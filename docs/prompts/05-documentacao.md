@@ -11,37 +11,41 @@ no código.
 
 1. **`README.md`** em português, com índice e as seções:
    - **Funcionalidades**: painel, documentos, chat, RAG e proteções, como estão implementados;
-   - **Arquitetura**: diagrama em texto (navegador → nginx → backend → Ollama, ChromaDB e `/data`),
+   - **Arquitetura**: diagrama em texto (navegador → nginx → backend → Ollama, ChromaDB, PostgreSQL e `/data`),
      tabela dos serviços com a porta publicada (só o frontend, em `127.0.0.1:8090`), o fluxo de um PDF
-     e o de uma pergunta, com os eventos do streaming;
+     e o de uma pergunta, com os eventos do streaming e a gravação da conversa;
    - **Tecnologias** (tabela) e **Requisitos**: Docker e Compose, Git, 8 GB de RAM para o Docker,
      cerca de 6 GB de disco, internet só na primeira execução (não diga que funciona offline desde o
      início);
    - **Executar com Docker**: clonar
-     (`git clone <url-do-repositório> celke-ia-local`), `.env` opcional (Linux/macOS e Windows),
+     (`git clone <url-do-repositório> celke-ia-local`), `.env` opcional (Linux/macOS e Windows; os
+     scripts criam a senha do PostgreSQL e o arquivo precisa ser guardado),
      `./scripts/iniciar.sh` ou `scripts\iniciar.ps1`, a alternativa com
-     `docker compose up -d --build` + `docker compose logs -f ollama-init`, tabela de endereços
+     `docker compose up -d --build` (exige `POSTGRES_PASSWORD` no `.env`) +
+     `docker compose logs -f ollama-init`, tabela de endereços
      (aplicação, `/api/docs`, `/api/health`) e como parar;
-   - **Usar a aplicação**: passo a passo no navegador e exemplos com `curl`;
+   - **Usar a aplicação**: passo a passo no navegador (inclusive a lista de conversas) e exemplos com
+     `curl` (pergunta, pergunta na mesma conversa, listar e abrir conversas);
    - **Configuração e troca de modelos**: tabela de todas as variáveis do `.env.example`, como trocar
      o modelo de chat, o que acontece ao trocar o de embeddings (coleção nova, documentos marcados
      para reprocessar) e a GPU NVIDIA com `compose.gpu.yaml`;
    - **Testes**: os três comandos (`backend-tests`, `frontend-tests` e integração) e uma tabela com o
      que cada arquivo de teste cobre;
-   - **Comandos úteis**: `ps`, logs de cada serviço, `ollama list`, `ollama ps`, `restart`,
-     `docker stats`;
-   - **Dados: preservar ou apagar**: os três volumes, `down` e `down -v` e como apagar só os
-     documentos mantendo os modelos;
+   - **Comandos úteis**: `ps`, logs de cada serviço, `psql` no container do banco, `ollama list`,
+     `ollama ps`, `restart`, `docker stats`;
+   - **Dados: preservar ou apagar**: os quatro volumes, `down` e `down -v`, como apagar documentos e
+     conversas mantendo os modelos e a cópia de segurança com `pg_dump`;
    - **Atualizar o projeto**: `git pull` + script; atualizar o `@celke/kole-react` com `npm update` ou
      `npm install @celke/kole-react@latest` e commitar o `package-lock.json`;
    - **Desenvolvimento**: `compose.dev.yaml` + `npm run dev` (único caso que exige Node);
    - **Problemas comuns** (tabela sintoma → o que fazer): modelo ausente, memória insuficiente,
      primeira resposta lenta, PDF sem texto (sem OCR), processamento interrompido, PDF duplicado,
      porta ocupada, página que não abre, documentos que somem do chat depois de trocar o modelo de
-     embeddings;
+     embeddings, PostgreSQL sem senha, senha diferente da usada na criação do banco, banco fora do ar;
    - **Hardware e limitações**: velocidade em CPU e com GPU, o raciocínio do `qwen3:4b`, sem OCR,
-     histórico só na página aberta, um PDF processado por vez;
+     só a última resposta com erro pode ser gerada de novo, um PDF processado por vez;
    - **Segurança**: uso local, sem login, não publicar na internet como está; portas; `APP_BIND`;
+     senha do PostgreSQL só no `.env`;
      arquivos com nome interno; PDF como dado não confiável; CORS desligado; usuário sem privilégios;
    - **Estrutura do projeto**, **Prompts para recriar o projeto** (link para `docs/prompts/`) e
      **Licença**.
@@ -50,7 +54,8 @@ no código.
    e commits só quando pedirem, em Conventional Commits em português, sem coautoria nem menção a
    ferramenta de IA; regras gerais (tudo no Docker, idiomas, sem segredos, só a porta do frontend,
    variável nova atualizada em `config.py`, `compose.yaml`, `.env.example` e README juntos); regras do
-   backend (camadas, `AppError` e formato de erro, SQLite e ChromaDB, exclusão vetores primeiro, PDF
+   backend (camadas, `AppError` e formato de erro, PostgreSQL e ChromaDB, conversas gravadas e
+   histórico lido do banco, exclusão vetores primeiro, PDF
    como dado não confiável, eventos SSE espelhados no `sse.ts`, dublês nos testes unitários, comando
    de testes); regras do frontend (só componentes e props reais do Kole, props em português, estilos só
    com variáveis do tema, ícones registrados no `main.tsx`, chamadas pela `api.ts`, comando de testes);

@@ -1,17 +1,18 @@
-from typing import Literal
-
 from pydantic import BaseModel, Field
-
-
-class HistoryMessage(BaseModel):
-    role: Literal["user", "assistant"]
-    content: str = Field(max_length=8000)
 
 
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
     document_ids: list[str] = Field(min_length=1, max_length=50)
-    history: list[HistoryMessage] = Field(default_factory=list, max_length=20)
+    conversation_id: str | None = Field(
+        default=None,
+        max_length=64,
+        description="Conversa em que a pergunta entra. Vazio = cria uma conversa nova (evento `conversation`).",
+    )
+    retry: bool = Field(
+        default=False,
+        description="Gera de novo a última resposta da conversa, que terminou em erro, sem repetir a pergunta.",
+    )
 
 
 class Source(BaseModel):

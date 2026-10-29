@@ -5,7 +5,7 @@ comandos e as variáveis de ambiente.
 
 | Pasta | Projeto | Stack |
 |---|---|---|
-| `backend/` | API, processamento dos PDFs e RAG | Python 3.13, FastAPI, Pydantic, PyMuPDF, Ollama, ChromaDB, SQLite |
+| `backend/` | API, processamento dos PDFs, RAG e conversas | Python 3.13, FastAPI, Pydantic, PyMuPDF, Ollama, ChromaDB, PostgreSQL (psycopg 3) |
 | `frontend/` | Painel, documentos e chat | React 19, TypeScript, Vite, React Router, `@celke/kole-react` |
 | raiz | Docker Compose, scripts de inicialização | Docker Compose |
 | `docs/prompts/` | Prompts que recriam o projeto do zero | Markdown |
@@ -25,25 +25,33 @@ comandos e as variáveis de ambiente.
   variáveis e arquivos em inglês.
 - Nada de segredos no código, no compose ou na documentação. Configuração só por variável de ambiente
   (com padrão no `compose.yaml` e explicação no `.env.example`).
-- Só a porta do frontend é publicada, em `127.0.0.1`. Não publique as portas do Ollama, do ChromaDB nem
-  do backend no `compose.yaml` (a do backend existe só no `compose.dev.yaml`).
+- Só a porta do frontend é publicada, em `127.0.0.1`. Não publique as portas do Ollama, do ChromaDB, do
+  PostgreSQL nem do backend no `compose.yaml` (a do backend existe só no `compose.dev.yaml`).
+- A senha do PostgreSQL (`POSTGRES_PASSWORD`) não tem padrão: vem do `.env`, que os `scripts/iniciar.*`
+  criam com uma senha aleatória.
 - Mudou uma variável? Atualize `config.py`, `compose.yaml`, `.env.example` e a tabela do README juntos.
 
 ## Backend
 
 - Camadas: `api/` (rotas finas, sem regra de negócio) → `services/` (regras) → `repositories/`
-  (SQLite e ChromaDB). Os objetos compartilhados são criados em `core/container.py`.
+  (PostgreSQL e ChromaDB). Os objetos compartilhados são criados em `core/container.py`.
 - Erros de negócio herdam de `AppError` (`core/errors.py`) e viram
   `{"erro": {"codigo", "mensagem"}}` com o código HTTP da classe. Mensagens para o usuário, em
   português e com a ação a tomar.
-- Metadados dos documentos no SQLite; trechos e vetores no ChromaDB, uma coleção por modelo de
-  embeddings. Excluir um documento remove os vetores primeiro, depois o arquivo e o registro.
+- Metadados dos documentos, conversas e mensagens no PostgreSQL (pool em
+  `repositories/database.py`, esquema idempotente criado na inicialização; SQL sempre com parâmetros
+  `%s` ou `psycopg.sql`); trechos e vetores no ChromaDB, uma coleção por modelo de embeddings. Excluir
+  um documento remove os vetores primeiro, depois o arquivo e o registro; as conversas continuam.
+- O chat grava a pergunta antes do streaming e a resposta no fim (com erro ou interrompida). O
+  histórico enviado ao modelo vem do banco, nunca do navegador.
 - O conteúdo dos PDFs é dado não confiável: vai ao modelo dentro de `<documentos>`, nunca como
   instrução. O modelo não executa comandos nem acessa arquivos.
-- O chat responde em Server-Sent Events: `sources`, `thinking` (uma vez), `token`, `done` ou `error`.
+- O chat responde em Server-Sent Events: `conversation`, `sources`, `thinking` (uma vez), `token`,
+  `done` ou `error`.
   Qualquer evento novo precisa ser tratado também em `frontend/src/services/sse.ts`.
-- Testes unitários usam os dublês de `tests/fakes.py` e não dependem do Ollama. Testes que usam o
-  Ollama e o ChromaDB reais ficam em `tests/integration/` com `@pytest.mark.integration`.
+- Testes unitários usam os dublês de `tests/fakes.py` e não dependem do Ollama; o banco é o serviço
+  `postgres-test` (em memória, tabelas limpas antes de cada teste). Testes que usam o Ollama e o
+  ChromaDB reais ficam em `tests/integration/` com `@pytest.mark.integration`.
 - Antes de entregar: `docker compose --profile test run --rm --build backend-tests` (Ruff e pytest).
 
 ## Frontend

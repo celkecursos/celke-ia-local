@@ -18,7 +18,12 @@ async function collect(stream: ReadableStream<Uint8Array>) {
 }
 
 describe('parseSseBlock', () => {
-  it('lê os cinco tipos de evento', () => {
+  it('lê os seis tipos de evento', () => {
+    expect(parseSseBlock('event: conversation\ndata: {"id": "c1", "title": "Pergunta"}')).toEqual({
+      type: 'conversation',
+      id: 'c1',
+      title: 'Pergunta',
+    });
     expect(parseSseBlock('event: token\ndata: {"text": "Olá"}')).toEqual({ type: 'token', text: 'Olá' });
     expect(parseSseBlock('event: done\ndata: {}')).toEqual({ type: 'done' });
     expect(parseSseBlock('event: thinking\ndata: {}')).toEqual({ type: 'thinking' });

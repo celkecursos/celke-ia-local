@@ -9,6 +9,20 @@ if ($LASTEXITCODE -ne 0) {
   exit 1
 }
 
+# Senha do PostgreSQL: gerada uma vez e guardada no .env (o banco guarda a senha da primeira subida).
+$envFile = Join-Path (Get-Location) '.env'
+$lines = @()
+if (Test-Path $envFile) { $lines = @(Get-Content $envFile) }
+if (-not ($lines | Where-Object { $_ -match '^POSTGRES_PASSWORD=.+' })) {
+  $bytes = New-Object byte[] 24
+  [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+  $password = -join ($bytes | ForEach-Object { $_.ToString('x2') })
+  $lines = @($lines | Where-Object { $_ -notmatch '^POSTGRES_PASSWORD=' }) + "POSTGRES_PASSWORD=$password"
+  # UTF-8 sem BOM: o Docker Compose le o .env assim
+  [System.IO.File]::WriteAllLines($envFile, [string[]]$lines)
+  Write-Host 'Senha do banco de dados criada no arquivo .env (guarde o arquivo; nao o envie ao git).'
+}
+
 Write-Host 'Subindo os servicos (a primeira vez constroi as imagens e pode levar alguns minutos)...'
 docker compose up -d --build
 if ($LASTEXITCODE -ne 0) { exit 1 }

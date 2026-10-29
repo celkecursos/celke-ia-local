@@ -11,6 +11,8 @@ export function parseSseBlock(block: string): ChatEvent | null {
   if (!data.length) return null;
   const payload = JSON.parse(data.join('\n'));
   switch (event) {
+    case 'conversation':
+      return { type: 'conversation', id: String(payload.id), title: String(payload.title ?? '') };
     case 'sources':
       return { type: 'sources', sources: payload as Source[] };
     case 'thinking':

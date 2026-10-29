@@ -15,7 +15,8 @@ serve o build e repassa `/api` ao backend, então o navegador só fala com uma o
    inglês no código do projeto.
 2. Componentes do Kole a usar: `ProvedorUi` (tema claro/escuro, toasts e confirmação), `Estrutura`
    (menu lateral), `CabecalhoPagina`, `Card`, `Indicador`/`Indicadores`, `Status`, `Alerta`, `Botao`,
-   `AcaoLinha`, `Tabela`, `CampoAnexo`, `Progresso`, `CampoSelectMultiplo`, `Vazio`, `useToast`,
+   `AcaoLinha`, `Tabela`, `CampoAnexo`, `Progresso`, `CampoSelectMultiplo`, `Vazio`, `Dialogo`,
+   `Lista`/`ItemLista`, `useToast`,
    `useConfirmacao` (com `.remover()`), `registrarIcones`, `formatBytes`, `formatDataHoraBr` e os
    componentes de conversa `Conversa`, `Mensagem`, `CampoMensagem` e `Referencias`.
 
@@ -83,8 +84,9 @@ entre cabeçalho, alertas, indicadores e cards é sempre o mesmo. O contêiner d
   servidor.".
 - `streamChat(body, signal)`: `fetch` POST com `Accept: text/event-stream` e o `AbortSignal`; erro HTTP
   vira `ApiError`; o corpo é lido por `readSse`, que junta blocos partidos entre pedaços, aceita
-  `\r\n` e entrega `sources`, `thinking`, `token`, `done` e `error` (com `codigo`/`mensagem` →
-  `code`/`message`). Abortado pelo usuário encerra sem erro.
+  `\r\n` e entrega `conversation` (`id`, `title`), `sources`, `thinking`, `token`, `done` e `error`
+  (com `codigo`/`mensagem` → `code`/`message`). Abortado pelo usuário encerra sem erro.
+- `api.conversations()`, `api.conversation(id)` e `api.deleteConversation(id)`.
 
 ## Telas
 
@@ -92,7 +94,8 @@ entre cabeçalho, alertas, indicadores e cards é sempre o mesmo. O contêiner d
 documentos cadastrados, prontos, processando e com erro (de `/api/documents/stats`, atualizando a cada
 5 s); `Alerta` de erro quando o Ollama estiver desconectado e de aviso quando um modelo ainda não
 estiver instalado (com o comando `docker compose logs -f ollama-init`); `Card` "Serviços" com backend,
-Ollama, modelo de chat, modelo de embeddings e ChromaDB, cada um com `Status`, atualizando a cada 10 s.
+Ollama, modelo de chat, modelo de embeddings, ChromaDB e PostgreSQL, cada um com `Status`, atualizando
+a cada 10 s.
 
 **Documentos:** `Card` com `CampoAnexo` (`accept="application/pdf,.pdf"`, `maxTamanho` de
 `VITE_MAX_UPLOAD_MB`, padrão 25), guardando o `ref` para obter o `File` com `arquivoDe`; botão Enviar,
@@ -104,18 +107,32 @@ vazio; ações por linha com `AcaoLinha`: Conversar (pronto → `/chat?doc=<id>`
 `useConfirmacao().remover()` dizendo que os trechos indexados também serão removidos). A lista é
 recarregada a cada 2 s **só enquanto** houver documento na fila ou processando.
 
-**Chat:** `CampoSelectMultiplo` com os documentos de `/api/chat/documents` (com busca e botão limpar),
-pré-selecionando os `?doc=` da URL e descartando os que não estão prontos; botão "Nova conversa";
-`Vazio` com link para Documentos quando não houver documento pronto. Abaixo, `Conversa` (com
-`larguraMaxima="52rem"` e estado vazio próprio) dentro de um contêiner com altura da janela, e no
+**Chat:** a conversa aberta fica na URL (`/chat?conversa=<id>`): ao recarregar ou escolher na lista, a
+página busca `/api/conversations/<id>` e mostra as mensagens gravadas (com as fontes e os erros) e
+seleciona os documentos da conversa; conversa inexistente → `Alerta` com botão "Nova conversa".
+`CampoSelectMultiplo` com os documentos de `/api/chat/documents` (com busca e botão limpar),
+pré-selecionando os `?doc=` da URL e descartando os que não estão prontos. `CabecalhoPagina` com o
+título da conversa aberta (ou "Chat") e os botões "Conversas" (ícone `history`, abre um `Dialogo`
+`aparencia="lateral"` com uma `Lista` de `ItemLista`, título e data da última mensagem, a aberta
+marcada como `ativo`, e `Vazio` quando não houver nenhuma), "Excluir" (só com conversa aberta;
+`useConfirmacao().remover()` dizendo que os documentos continuam) e "Nova conversa" (limpa a URL e as
+mensagens), todos desabilitados enquanto a resposta é gerada. `Vazio` com link para Documentos quando
+não houver documento pronto. Abaixo, `Conversa` (com
+`larguraMaxima="52rem"` e estado vazio próprio) num contêiner que preenche o resto da área de
+conteúdo da `Estrutura` (o `.lp-content` vira coluna flex só nesta página, via `:has()`): cabeçalho e
+seleção de documentos ficam sempre visíveis, só as mensagens rolam e o campo fica fixo embaixo. No
 `campo` um `CampoMensagem` (desabilitado sem documento escolhido, `maxCaracteres={4000}`, `gerando` e
 `aoParar` que aborta o `AbortController`). Cada pergunta acrescenta a mensagem do usuário
 (`Mensagem autor="usuario"`, nome "Você", hora) e a do assistente (`autor="assistente"`, nome
-"Celke IA", avatar com "IA", `estado` gerando/concluída/erro, `copiavel`, `aoTentarNovamente` que
-refaz a mesma pergunta com o histórico anterior a ela). Enquanto só chegou `thinking`, mostre
-"Analisando os trechos dos documentos…"; os `token` são concatenados no conteúdo. As fontes vão no
-`rodape` como `Referencias` (título `[n] arquivo`, detalhe "Página N", trecho). Parar mantém o que já
-chegou (ou "Resposta interrompida."). O histórico enviado ao backend são as mensagens concluídas.
+"Celke IA", avatar com "IA", `estado` gerando/concluída/erro, `copiavel`). O pedido leva
+`conversation_id` da conversa aberta; sem ela, o evento `conversation` traz o id da conversa criada,
+que vai para a URL com `replace` (recarregar continua nela). `aoTentarNovamente` só na **última**
+mensagem: manda `retry: true` com a última pergunta, e o backend refaz a resposta sem repetir a
+pergunta. Enquanto só chegou `thinking`, mostre "Analisando os trechos dos documentos…"; os `token`
+são concatenados no conteúdo. As fontes vão no `rodape` como `Referencias` (título `[n] arquivo`,
+detalhe "Página N", trecho). Parar mantém o que já chegou (ou "Resposta interrompida.") — o backend
+grava o mesmo. O histórico não é enviado: o backend o lê da conversa. Depois de cada resposta, a lista
+de conversas é recarregada.
 
 **Não encontrada:** `Vazio` com botão para o painel.
 
@@ -140,7 +157,7 @@ saudável) e o `frontend-tests` (`profiles: [test]`, target `test`).
 
 ## Testes
 
-`src/services/sse.test.ts` com Vitest: os cinco tipos de evento, evento desconhecido ignorado, blocos
+`src/services/sse.test.ts` com Vitest: os seis tipos de evento, evento desconhecido ignorado, blocos
 partidos entre pedaços, `\r\n` e último bloco sem linha em branco.
 
 ## Verificação
@@ -154,4 +171,5 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8090/documentos   # 20
 ```
 
 Abra http://localhost:8090 e confira o menu, o painel com os serviços verdes, a página de documentos
-e o chat, nos temas claro e escuro e numa janela estreita (celular).
+e o chat, nos temas claro e escuro e numa janela estreita (celular). No chat, faça uma pergunta,
+confira o `?conversa=` na URL, recarregue a página (a conversa continua) e abra a lista de conversas.

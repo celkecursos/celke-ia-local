@@ -53,6 +53,11 @@ class VectorStoreError(AppError):
     code = "banco_vetorial_indisponivel"
 
 
+class DatabaseUnavailableError(AppError):
+    status_code = 503
+    code = "banco_de_dados_indisponivel"
+
+
 class EmbeddingMismatchError(AppError):
     status_code = 409
     code = "embeddings_incompativeis"

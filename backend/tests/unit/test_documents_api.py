@@ -142,6 +142,7 @@ def test_status_reports_services(client, container):
 
     assert body["backend"]["online"] is True
     assert body["vector_store"]["online"] is True
+    assert body["database"]["online"] is True
     assert body["ollama"]["online"] is True
     assert body["ollama"]["embedding_model"] == {"name": "nomic-embed-text", "installed": True}
 

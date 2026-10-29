@@ -41,6 +41,7 @@ export interface SystemStatus {
     error: string | null;
   };
   vector_store: ServiceStatus;
+  database: ServiceStatus;
 }
 
 export interface ChatDocument {
@@ -57,19 +58,40 @@ export interface Source {
   score: number;
 }
 
-export interface HistoryMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
 export interface ChatRequest {
   question: string;
   document_ids: string[];
-  history: HistoryMessage[];
+  /** Sem conversa, o backend cria uma e avisa no evento `conversation`. */
+  conversation_id?: string;
+  /** Gera de novo a última resposta da conversa, que terminou em erro. */
+  retry?: boolean;
+}
+
+export interface StoredMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  state: 'concluida' | 'erro';
+  error_message: string | null;
+  sources: Source[];
+  created_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  document_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationDetail extends Conversation {
+  messages: StoredMessage[];
 }
 
 /** Eventos do POST /api/chat (Server-Sent Events). */
 export type ChatEvent =
+  | { type: 'conversation'; id: string; title: string }
   | { type: 'sources'; sources: Source[] }
   | { type: 'thinking' }
   | { type: 'token'; text: string }

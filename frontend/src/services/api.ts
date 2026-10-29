@@ -2,6 +2,8 @@ import type {
   ChatDocument,
   ChatEvent,
   ChatRequest,
+  Conversation,
+  ConversationDetail,
   DocumentItem,
   DocumentStats,
   SystemStatus,
@@ -55,6 +57,10 @@ export const api = {
   reprocess: (id: string) =>
     request<DocumentItem>(`/documents/${encodeURIComponent(id)}/reprocess`, { method: 'POST' }),
   chatDocuments: () => request<{ items: ChatDocument[] }>('/chat/documents').then((r) => r.items),
+  conversations: () => request<{ items: Conversation[] }>('/conversations').then((r) => r.items),
+  conversation: (id: string) => request<ConversationDetail>(`/conversations/${encodeURIComponent(id)}`),
+  deleteConversation: (id: string) =>
+    request<void>(`/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 };
 
 /**

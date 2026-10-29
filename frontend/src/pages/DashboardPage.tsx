@@ -99,6 +99,10 @@ export function DashboardPage() {
               <span>ChromaDB (banco vetorial)</span>
               <OnlineStatus online={!!s?.vector_store.online} rotulo={s ? undefined : 'Verificando'} />
             </li>
+            <li>
+              <span>PostgreSQL (documentos e conversas)</span>
+              <OnlineStatus online={!!s?.database.online} rotulo={s ? undefined : 'Verificando'} />
+            </li>
           </ul>
         )}
       </Card>

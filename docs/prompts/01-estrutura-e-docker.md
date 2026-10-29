@@ -16,9 +16,10 @@ Arquitetura final (as etapas seguintes completam):
 | `ollama` | `ollama/ollama:0.40.13` | nenhuma |
 | `ollama-init` | `ollama/ollama:0.40.13` (baixa os modelos e termina) | nenhuma |
 | `chroma` | `chromadb/chroma:1.5.9` | nenhuma |
+| `postgres` | `postgres:18.6-alpine` (documentos, conversas e mensagens) | nenhuma |
 
-Nesta etapa você cria a estrutura e os serviços de infraestrutura (Ollama, download dos modelos e
-ChromaDB). Backend e frontend entram nas etapas 2 e 3.
+Nesta etapa você cria a estrutura e os serviços de infraestrutura (Ollama, download dos modelos,
+ChromaDB e PostgreSQL). Backend e frontend entram nas etapas 2 e 3.
 
 ## Tarefas
 
@@ -49,7 +50,13 @@ ChromaDB). Backend e frontend entram nas etapas 2 e 3.
      `chroma-data:/data`, `restart: unless-stopped`, **sem** `ports`. A imagem não tem `curl`; use no
      healthcheck o bash com `/dev/tcp`:
      `bash -c 'exec 3<>/dev/tcp/127.0.0.1/8000 && printf "GET /api/v2/heartbeat HTTP/1.0\r\n\r\n" >&3 && grep -q 200 <&3'`.
-   - Declare os volumes `app-data`, `ollama-models` e `chroma-data`.
+   - **`postgres`**: imagem `postgres:18.6-alpine`, `POSTGRES_DB: ${POSTGRES_DB:-celke_ia_local}`,
+     `POSTGRES_USER: ${POSTGRES_USER:-celke}`, `POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}` (**sem**
+     senha padrão: sem ela o PostgreSQL não sobe e diz por quê), volume
+     `postgres-data:/var/lib/postgresql` (a partir da versão 18 os dados ficam em `18/docker` dentro
+     dele), healthcheck `pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"` (intervalo 5s,
+     `start_period` 10s, 10 tentativas), `restart: unless-stopped`, **sem** `ports`.
+   - Declare os volumes `app-data`, `ollama-models`, `chroma-data` e `postgres-data`.
 
    Comente no topo do arquivo como subir (`docker compose up -d --build` ou os scripts da etapa 4).
 
@@ -59,7 +66,9 @@ ChromaDB). Backend e frontend entram nas etapas 2 e 3.
    publica `127.0.0.1:8000:8000` no `backend`, para o Vite em desenvolvimento).
 
 4. Crie o `.env.example` comentado, em português, com: `APP_PORT=8090`, `APP_BIND=127.0.0.1`
-   (explicando que `0.0.0.0` abre para a rede local sem login), `CHAT_MODEL=qwen3:4b`,
+   (explicando que `0.0.0.0` abre para a rede local sem login), `POSTGRES_PASSWORD=` vazio
+   (obrigatória; os scripts da etapa 4 geram uma aleatória; vale só na criação do volume),
+   `POSTGRES_DB=celke_ia_local`, `POSTGRES_USER=celke`, `CHAT_MODEL=qwen3:4b`,
    `EMBEDDING_MODEL=nomic-embed-text`, `EMBEDDING_DOCUMENT_PREFIX="search_document: "`,
    `EMBEDDING_QUERY_PREFIX="search_query: "` (prefixos do nomic; vazios para outros modelos),
    `CHAT_NUM_CTX=8192`, `CHAT_TEMPERATURE=0.2`, `CHAT_THINK=auto` (explicando que o `qwen3:4b` sempre
@@ -75,13 +84,17 @@ ChromaDB). Backend e frontend entram nas etapas 2 e 3.
 
 7. Se a pasta não for um repositório git, execute `git init -b main`.
 
+8. Crie o `.env` com uma senha aleatória para o PostgreSQL (o arquivo fica fora do git):
+   `printf 'POSTGRES_PASSWORD=%s\n' "$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')" > .env`.
+
 ## Verificação
 
 ```bash
 docker compose config -q && echo compose-ok
 docker compose -f compose.yaml -f compose.gpu.yaml config -q && echo gpu-ok
-docker compose up -d ollama chroma ollama-init
-docker compose ps                       # ollama e chroma (healthy)
+docker compose up -d ollama chroma postgres ollama-init
+docker compose ps                       # ollama, chroma e postgres (healthy)
+docker compose exec postgres psql -U celke celke_ia_local -c 'select version()'   # PostgreSQL 18.6
 docker compose logs -f ollama-init      # até "Modelos prontos." (o primeiro download leva alguns minutos)
 docker compose exec ollama ollama list  # qwen3:4b e nomic-embed-text:latest
 docker compose up ollama-init           # segunda vez: "já instalado" para os dois, sem baixar nada
