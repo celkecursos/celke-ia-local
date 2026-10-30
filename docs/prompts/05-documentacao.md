@@ -25,23 +25,27 @@ no código.
      `docker compose logs -f ollama-init`, tabela de endereços
      (aplicação, `/api/docs`, `/api/health`) e como parar;
    - **Usar a aplicação**: passo a passo no navegador (inclusive a lista de conversas) e exemplos com
-     `curl` (pergunta, pergunta na mesma conversa, listar e abrir conversas);
+     `curl` (pergunta, pergunta na mesma conversa, listar e abrir conversas), com um bloco para o
+     Windows PowerShell usando `curl.exe` e o JSON em arquivo;
    - **Configuração e troca de modelos**: tabela de todas as variáveis do `.env.example`, como trocar
      o modelo de chat, o que acontece ao trocar o de embeddings (coleção nova, documentos marcados
-     para reprocessar) e a GPU NVIDIA com `compose.gpu.yaml`;
+     para reprocessar) e a GPU NVIDIA com `COMPOSE_FILE` no `.env` (no Windows, `;` como separador e
+     só o driver NVIDIA; no Linux, `:` e o NVIDIA Container Toolkit);
    - **Testes**: os três comandos (`backend-tests`, `frontend-tests` e integração) e uma tabela com o
      que cada arquivo de teste cobre;
    - **Comandos úteis**: `ps`, logs de cada serviço, `psql` no container do banco, `ollama list`,
      `ollama ps`, `restart`, `docker stats`;
    - **Dados: preservar ou apagar**: os quatro volumes, `down` e `down -v`, como apagar documentos e
-     conversas mantendo os modelos e a cópia de segurança com `pg_dump`;
+     conversas mantendo os modelos e a cópia de segurança com `pg_dump` (no Windows PowerShell, por
+     `cmd /c`, porque o `<` não existe e o `>` do 5.1 grava em UTF-16);
    - **Atualizar o projeto**: `git pull` + script; atualizar o `@celke/kole-react` com `npm update` ou
      `npm install @celke/kole-react@latest` e commitar o `package-lock.json`;
    - **Desenvolvimento**: `compose.dev.yaml` + `npm run dev` (único caso que exige Node);
    - **Problemas comuns** (tabela sintoma → o que fazer): modelo ausente, memória insuficiente,
      primeira resposta lenta, PDF sem texto (sem OCR), processamento interrompido, PDF duplicado,
      porta ocupada, página que não abre, documentos que somem do chat depois de trocar o modelo de
-     embeddings, PostgreSQL sem senha, senha diferente da usada na criação do banco, banco fora do ar;
+     embeddings, PostgreSQL sem senha, senha diferente da usada na criação do banco, banco fora do ar
+     e, no Windows, o limite de memória no `.wslconfig` e a porta reservada pelo sistema;
    - **Hardware e limitações**: velocidade em CPU e com GPU, o raciocínio do `qwen3:4b`, sem OCR,
      só a última resposta com erro pode ser gerada de novo, um PDF processado por vez;
    - **Segurança**: uso local, sem login, não publicar na internet como está; portas; `APP_BIND`;

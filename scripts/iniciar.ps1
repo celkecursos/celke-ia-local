@@ -1,6 +1,8 @@
 # Sobe o Celke IA Local no Windows (PowerShell), espera os modelos e mostra o endereço.
 # Uso: powershell -ExecutionPolicy Bypass -File scripts\iniciar.ps1
-$ErrorActionPreference = 'Stop'
+# Sem 'Stop': no PowerShell 5.1, um simples aviso do Docker no stderr viraria erro fatal com *> $null.
+# As falhas do Docker sao conferidas pelo $LASTEXITCODE.
+$ErrorActionPreference = 'Continue'
 Set-Location (Join-Path $PSScriptRoot '..')
 
 docker info *> $null
@@ -12,7 +14,7 @@ if ($LASTEXITCODE -ne 0) {
 # Senha do PostgreSQL: gerada uma vez e guardada no .env (o banco guarda a senha da primeira subida).
 $envFile = Join-Path (Get-Location) '.env'
 $lines = @()
-if (Test-Path $envFile) { $lines = @(Get-Content $envFile) }
+if (Test-Path $envFile) { $lines = @(Get-Content $envFile -Encoding UTF8) }
 if (-not ($lines | Where-Object { $_ -match '^POSTGRES_PASSWORD=.+' })) {
   $bytes = New-Object byte[] 24
   [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)

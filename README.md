@@ -94,8 +94,11 @@ parar, com o que já tinha chegado). O histórico enviado ao modelo são as últ
 - **Docker** com o **Docker Compose**: Docker Desktop (Windows e macOS) ou Docker Engine com o plugin
   Compose (Linux).
 - **Git** para clonar (ou baixe o ZIP pelo GitHub).
-- **Memória:** 8 GB de RAM livres para o Docker (o `qwen3:4b` usa cerca de 4 GB). No Docker Desktop,
-  ajuste em *Settings → Resources*.
+- **Memória:** 8 GB de RAM livres para o Docker (o `qwen3:4b` usa cerca de 4 GB). No macOS, ajuste em
+  *Settings → Resources* do Docker Desktop. No Windows com WSL2, o Docker usa por padrão metade da RAM
+  e o limite fica no arquivo `.wslconfig` (veja [Problemas comuns](#problemas-comuns)).
+- **Windows:** Windows 10 ou 11 com o Docker Desktop no modo WSL2 (o padrão). Os comandos do README
+  funcionam no PowerShell, exceto onde há um bloco próprio para ele.
 - **Disco:** cerca de 6 GB (imagens e modelos).
 - **Internet na primeira execução:** para baixar as imagens e os modelos. Depois disso, a aplicação
   funciona sem internet.
@@ -114,7 +117,7 @@ scripts do passo 3 criam o arquivo com uma senha aleatória para o PostgreSQL (`
 
 ```bash
 cp .env.example .env          # Linux e macOS
-copy .env.example .env        # Windows (cmd)
+copy .env.example .env        # Windows (PowerShell ou cmd)
 ```
 
 Guarde o `.env`: o PostgreSQL grava a senha na primeira subida, e uma senha nova não abre o banco antigo
@@ -188,6 +191,17 @@ curl http://localhost:8090/api/conversations                     # conversas
 curl http://localhost:8090/api/conversations/<id-da-conversa>    # mensagens com as fontes
 ```
 
+No Windows PowerShell, `curl` é outro comando (apelido de `Invoke-WebRequest`) e as aspas do JSON se
+perdem na linha de comando. Use `curl.exe` e envie a pergunta por um arquivo:
+
+```powershell
+curl.exe -F "file=@meu-arquivo.pdf;type=application/pdf" http://localhost:8090/api/documents
+curl.exe http://localhost:8090/api/documents
+@{ question = 'Sobre o que é o documento?'; document_ids = @('<id>') } | ConvertTo-Json |
+  ForEach-Object { [IO.File]::WriteAllText("$PWD\pergunta.json", $_) }
+curl.exe -N -X POST http://localhost:8090/api/chat -H "Content-Type: application/json" -d "@pergunta.json"
+```
+
 ## Configuração e troca de modelos
 
 As variáveis ficam no `.env` (modelo completo em [`.env.example`](.env.example)). Depois de mudar,
@@ -197,6 +211,7 @@ execute `docker compose up -d` (ou o script de novo).
 |---|---|---|
 | `APP_PORT` | `8090` | Porta da aplicação no seu computador |
 | `APP_BIND` | `127.0.0.1` | `0.0.0.0` abre para a rede local (ver [Segurança](#segurança)) |
+| `COMPOSE_FILE` | (vazio) | Liga a GPU NVIDIA em todos os comandos (ver abaixo) |
 | `CHAT_MODEL` | `qwen3:4b` | Modelo de chat do Ollama |
 | `CHAT_THINK` | `auto` | `auto` separa o raciocínio da resposta quando o modelo raciocina |
 | `CHAT_NUM_CTX` | `8192` | Janela de contexto (tokens); mais contexto, mais memória |
@@ -211,19 +226,27 @@ execute `docker compose up -d` (ou o script de novo).
 | `OLLAMA_KEEP_ALIVE` | `30m` | Tempo que o modelo fica na memória depois da última pergunta |
 
 **Trocar o modelo de chat** (por exemplo `qwen3:8b`, que exige mais memória): mude `CHAT_MODEL` e rode
-`./scripts/iniciar.sh`. O `ollama-init` baixa o novo modelo; o antigo continua no volume (apague com
+o script de inicialização de novo. O `ollama-init` baixa o novo modelo; o antigo continua no volume (apague com
 `docker compose exec ollama ollama rm qwen3:4b`).
 
 **Trocar o modelo de embeddings:** mude `EMBEDDING_MODEL` (e os prefixos). Cada modelo de embeddings tem
 a própria coleção no ChromaDB, porque vetores de modelos diferentes não podem ser comparados. Os
 documentos já enviados aparecem como **Reprocessar** e saem do chat até serem reprocessados.
 
-**GPU NVIDIA** (Linux ou Windows com WSL2, com o
-[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)):
+**GPU NVIDIA.** No Windows, basta o driver NVIDIA atualizado e o Docker Desktop com WSL2, sem instalar
+nada dentro do WSL. No Linux, é preciso o
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+
+Para valer em todos os comandos, inclusive nos scripts, acrescente uma linha ao `.env` e rode o script
+de inicialização de novo:
 
 ```bash
-docker compose -f compose.yaml -f compose.gpu.yaml up -d
+COMPOSE_FILE=compose.yaml;compose.gpu.yaml   # Windows
+COMPOSE_FILE=compose.yaml:compose.gpu.yaml   # Linux
 ```
+
+Para conferir, faça uma pergunta e rode `docker compose exec ollama ollama ps`: a coluna `PROCESSOR`
+deve mostrar `100% GPU`. Em computadores sem GPU NVIDIA, o `ollama` não sobe com essa linha no `.env`.
 
 ## Testes
 
@@ -293,6 +316,14 @@ docker compose exec -T postgres pg_dump -U celke celke_ia_local > backup.sql
 docker compose exec -T postgres psql -U celke celke_ia_local < backup.sql
 ```
 
+No Windows PowerShell, rode pelo `cmd`: o `<` não existe no PowerShell e, no 5.1, o `>` grava em UTF-16,
+o que estraga o arquivo.
+
+```powershell
+cmd /c "docker compose exec -T postgres pg_dump -U celke celke_ia_local > backup.sql"
+cmd /c "docker compose exec -T postgres psql -U celke celke_ia_local < backup.sql"
+```
+
 **Vindo de uma versão com SQLite:** na primeira subida com o PostgreSQL, o backend importa os documentos
 do `/data/app.db` (os vetores no ChromaDB continuam valendo) e renomeia o arquivo para
 `app.db.importado`, que fica como cópia de segurança.
@@ -302,6 +333,7 @@ do `/data/app.db` (os vetores no ChromaDB continuam valendo) e renomeia o arquiv
 ```bash
 git pull
 ./scripts/iniciar.sh         # reconstrói as imagens e mantém os dados
+# Windows: powershell -ExecutionPolicy Bypass -File scripts\iniciar.ps1
 ```
 
 O layout vem do pacote `@celke/kole-react` do npm (`"^0.1.0"` no `frontend/package.json`). Para trazer
@@ -340,9 +372,11 @@ o backend, `docker compose up -d --build backend`.
 | PDF com erro "processamento interrompido" | O backend reiniciou durante o processamento. Clique em **Reprocessar** |
 | "Este PDF já foi enviado" | O mesmo arquivo (mesmo conteúdo) já está na lista |
 | Porta 8090 ocupada | Defina outra no `.env` (`APP_PORT=8091`) |
+| Windows: "Ollama não tem memória suficiente" ou containers encerrados por falta de memória | Crie `%UserProfile%\.wslconfig` com as linhas `[wsl2]` e `memory=8GB`, rode `wsl --shutdown` e reabra o Docker Desktop |
+| Windows: "permission denied" ou "access a socket" ao publicar a porta | O Windows reservou a porta (`netsh interface ipv4 show excludedportrange protocol=tcp`). Defina outra em `APP_PORT` |
 | Página não abre | `docker compose ps` (todos `healthy`?) e `docker compose logs backend frontend` |
 | Mudou o modelo de embeddings e os documentos sumiram do chat | Reprocesse cada documento em **Documentos** |
-| `postgres` não sobe: "superuser password is not specified" | Falta `POSTGRES_PASSWORD` no `.env`. Rode `./scripts/iniciar.sh` (cria a senha) ou preencha à mão |
+| `postgres` não sobe: "superuser password is not specified" | Falta `POSTGRES_PASSWORD` no `.env`. Rode o script de inicialização (cria a senha) ou preencha à mão |
 | Backend reinicia em loop com "password authentication failed" | O `.env` tem uma senha diferente da usada na criação do banco. Volte a senha antiga ou, para começar do zero, apague o volume `celke-ia-local_postgres-data` (perde documentos e conversas) |
 | "O banco de dados (PostgreSQL) não está respondendo" | `docker compose ps postgres` e `docker compose logs postgres` |
 
