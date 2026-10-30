@@ -8,9 +8,9 @@ comandos e as variáveis de ambiente.
 | `backend/` | API, processamento dos PDFs, RAG e conversas | Python 3.13, FastAPI, Pydantic, PyMuPDF, Ollama, ChromaDB, PostgreSQL (psycopg 3) |
 | `frontend/` | Chat, documentos e status | React 19, TypeScript, Vite, React Router, `@celke/kole-react` |
 | raiz | Docker Compose, scripts de inicialização | Docker Compose |
-| `prompts-iniciais/` | Prompts que recriam o projeto do zero, com o conteúdo exato dos arquivos (gerados) | Markdown |
+| `docs/prompts-iniciais/` | Prompts que recriam o projeto do zero, sozinhos, com o conteúdo exato dos arquivos (gerados) | Markdown |
 | `docs/prompts/` | As mesmas etapas descritas em texto, para o tutorial | Markdown |
-| `docs/gerador-prompts/` | Gera e confere `prompts-iniciais/` | Python |
+| `docs/gerador-prompts/` | Gera e confere `docs/prompts-iniciais/` | Python |
 
 ## Branches e commits
 
@@ -80,7 +80,7 @@ comandos e as variáveis de ambiente.
 correspondente no mesmo commit. Os prompts são escritos como originais: sem datas, sem histórico de
 correções e sem caminhos de outros projetos.
 
-`prompts-iniciais/` é gerado: não edite à mão. O texto das orientações fica em
+`docs/prompts-iniciais/` é gerado: não edite à mão. O texto das orientações fica em
 `docs/gerador-prompts/gerar_prompts.py`, e o conteúdo dos arquivos vem do próprio projeto. Mudou um arquivo?
 Gere de novo no mesmo commit e confira (o segundo comando precisa terminar com `diferentes 0`):
 
