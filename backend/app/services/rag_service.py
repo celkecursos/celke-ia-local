@@ -137,6 +137,8 @@ class RagService:
     def start(self, request: ChatRequest) -> ChatTurn:
         """Valida e grava a pergunta antes de abrir o stream, para os erros simples virarem resposta HTTP comum."""
         document_ids = list(dict.fromkeys(request.document_ids))
+        if not document_ids and not request.web_search:
+            raise InvalidFileError("Escolha ao menos um documento ou peça a resposta com a internet.")
         self._check_documents(document_ids)
 
         if request.conversation_id is None:
@@ -163,7 +165,8 @@ class RagService:
         else:
             question, history = request.question, messages
             self._conversations.add_message(conversation.id, role="user", content=question)
-        self._conversations.update_documents(conversation.id, document_ids)
+        if document_ids:
+            self._conversations.update_documents(conversation.id, document_ids)
         return ChatTurn(conversation, question, document_ids, to_history(history), request.web_search)
 
     def _save_answer(

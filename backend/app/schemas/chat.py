@@ -5,7 +5,9 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=4000)
-    document_ids: list[str] = Field(min_length=1, max_length=50)
+    document_ids: list[str] = Field(
+        default_factory=list, max_length=50, description="Obrigatório, a não ser com `web_search`."
+    )
     conversation_id: str | None = Field(
         default=None,
         max_length=64,

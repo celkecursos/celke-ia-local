@@ -5,9 +5,11 @@ import {
   CampoMensagem,
   CampoSelectMultiplo,
   Conversa,
+  Chip,
   Dialogo,
   ItemLista,
   Lista,
+  MenuSuspenso,
   Mensagem,
   Referencias,
   Vazio,
@@ -79,6 +81,8 @@ export function ChatPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>(() => params.getAll('doc'));
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
+  // Começa em Documentos: nada vai para a internet sem a pessoa escolher.
+  const [answerFrom, setAnswerFrom] = useState<'documents' | 'web'>('documents');
   const [listOpen, setListOpen] = useState(false);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [loadError, setLoadError] = useState<string>();
@@ -102,6 +106,7 @@ export function ChatPage() {
     abortRef.current?.abort();
     currentRef.current = conversationParam;
     setLoadError(undefined);
+    setAnswerFrom('documents');
     if (!conversationParam) {
       setMessages([]);
       return;
@@ -109,12 +114,13 @@ export function ChatPage() {
     let cancelled = false;
     setLoadingConversation(true);
     setMessages([]);
+    // Conversa aberta começa sem documentos: a pessoa escolhe os da próxima pergunta.
+    setSelectedIds([]);
     api
       .conversation(conversationParam)
       .then((c) => {
         if (cancelled) return;
         setMessages(c.messages.map(fromStored));
-        setSelectedIds(c.document_ids);
       })
       .catch((e) => {
         if (cancelled) return;
@@ -186,7 +192,7 @@ export function ChatPage() {
   }
 
   function send(question: string, webSearch = false) {
-    if (!selectedIds.length || generating) return;
+    if ((!webSearch && !selectedIds.length) || generating) return;
     const assistantId = newId();
     const now = new Date();
     setMessages((list) => [
@@ -201,7 +207,6 @@ export function ChatPage() {
         createdAt: now,
       },
     ]);
-    if (!webSearch) setText('');
     void ask(question, assistantId, false, webSearch);
   }
 
@@ -244,6 +249,7 @@ export function ChatPage() {
 
   const options = (documents.data ?? []).map((d) => ({ valor: d.id, rotulo: d.filename }));
   const noDocuments = documents.data && documents.data.length === 0;
+  const useWeb = answerFrom === 'web';
 
   return (
     <div className="app-chat">
@@ -339,16 +345,25 @@ export function ChatPage() {
         </Vazio>
       ) : (
         <>
-          <CampoSelectMultiplo
-            rotulo="Documentos da conversa"
-            dica="As respostas usam só os documentos escolhidos, a não ser que você peça para pesquisar na internet."
-            placeholder={documents.loading ? 'Carregando…' : 'Escolha um ou mais documentos'}
-            opcoes={options}
-            valor={selectedIds}
-            aoMudar={setSelectedIds}
-            comBusca
-            botaoLimpar
-          />
+          <div className="app-chat-documentos">
+            <CampoSelectMultiplo
+              rotulo="Documentos da pergunta"
+              dica="As respostas usam só os documentos escolhidos, a não ser que você peça para pesquisar na internet."
+              placeholder={documents.loading ? 'Carregando…' : 'Escolha um ou mais documentos'}
+              opcoes={options}
+              valor={selectedIds}
+              aoMudar={setSelectedIds}
+              comBusca
+              botaoLimpar
+            />
+            <Botao
+              rotulo="Selecionar todos"
+              icone="check"
+              severidade="secundario"
+              disabled={!options.length || selectedIds.length === options.length}
+              onClick={() => setSelectedIds(options.map((o) => o.valor))}
+            />
+          </div>
           <div className="app-chat-conversa">
             <Conversa
               rotulo="Conversa com os documentos"
@@ -368,12 +383,55 @@ export function ChatPage() {
                 <CampoMensagem
                   valor={text}
                   aoMudar={setText}
-                  aoEnviar={send}
+                  aoEnviar={(question) => {
+                    setText('');
+                    send(question, useWeb);
+                  }}
                   gerando={generating}
                   aoParar={() => abortRef.current?.abort()}
-                  desabilitado={!selectedIds.length || loadingConversation}
-                  placeholder={selectedIds.length ? 'Escreva sua pergunta' : 'Escolha ao menos um documento'}
+                  desabilitado={(!useWeb && !selectedIds.length) || loadingConversation}
+                  placeholder={
+                    useWeb
+                      ? 'Escreva sua pergunta (será enviada ao buscador)'
+                      : selectedIds.length
+                        ? 'Escreva sua pergunta'
+                        : 'Escolha ao menos um documento'
+                  }
                   maxCaracteres={4000}
+                  acoesExtras={
+                    <div className="app-campo-opcoes">
+                      <MenuSuspenso
+                        icone="plus"
+                        aria-label="Mais opções"
+                        dica="Mais opções"
+                        semSeta
+                        severidade="secundario"
+                        aparencia="fantasma"
+                        formato="pilula"
+                        direcao="cima"
+                        alinhamento="inicio"
+                        larguraMenu="16rem"
+                        desabilitado={generating}
+                        itens={[
+                          { tipo: 'titulo', rotulo: 'Responder com' },
+                          { id: 'documents', rotulo: 'Documentos', icone: 'file-text', ativo: !useWeb },
+                          { id: 'web', rotulo: 'Busca na internet', icone: 'globe', ativo: useWeb },
+                          { tipo: 'divisor' },
+                          { id: 'upload', rotulo: 'Enviar PDF', icone: 'upload' },
+                        ]}
+                        aoEscolher={(id) => {
+                          if (id === 'upload') navigate('/documentos');
+                          else setAnswerFrom(id === 'web' ? 'web' : 'documents');
+                        }}
+                      />
+                      {useWeb && (
+                        <Chip
+                          rotulo="Busca na internet"
+                          aoRemover={generating ? undefined : () => setAnswerFrom('documents')}
+                        />
+                      )}
+                    </div>
+                  }
                 />
               }
             >
@@ -387,8 +445,7 @@ export function ChatPage() {
                 }
                 const isWeb = m.answerKind === 'web';
                 // Só a última resposta oferece a busca, e nunca durante a geração.
-                const canSearchWeb =
-                  index === messages.length - 1 && m.state === 'concluida' && !isWeb && !!selectedIds.length;
+                const canSearchWeb = index === messages.length - 1 && m.state === 'concluida' && !isWeb;
                 const offerProminently = canSearchWeb && m.answerKind === 'not_found';
                 return (
                   <Mensagem

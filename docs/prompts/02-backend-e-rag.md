@@ -216,7 +216,7 @@ português.
 | `POST /documents/{id}/reprocess` | 202 |
 | `DELETE /documents/{id}` | 204 |
 | `GET /chat/documents` | documentos prontos para o chat |
-| `POST /chat` | `{"question" (1–4000), "document_ids" (1–50), "conversation_id" (opcional), "retry" (padrão false)}` → `text/event-stream` com `Cache-Control: no-cache` e `X-Accel-Buffering: no` |
+| `POST /chat` | `{"question" (1–4000), "document_ids" (até 50; obrigatório sem `web_search`), "conversation_id" (opcional), "retry" (padrão false), "web_search" (padrão false)}` → `text/event-stream` com `Cache-Control: no-cache` e `X-Accel-Buffering: no` |
 | `GET /conversations` | `{"items": [...]}` com `id`, `title`, `document_ids`, `created_at`, `updated_at` |
 | `GET /conversations/{id}` | a conversa com `messages` (`id`, `role`, `content`, `state`, `error_message`, `sources`, `created_at`) |
 | `DELETE /conversations/{id}` | 204; apaga as mensagens e mantém os documentos |
@@ -254,7 +254,8 @@ entre aspas, porque têm `: `), `OLLAMA_URL: http://ollama:11434`, `CHROMA_HOST:
 
 ## Busca na internet
 
-A busca é opcional e só acontece quando a pessoa pede (`web_search: true` em `POST /chat`).
+A busca é opcional e só acontece quando a pessoa pede (`web_search: true` em `POST /chat`). `document_ids`
+passa a ser opcional só nesse caso; sem documentos nem busca, erro 422 pedindo um documento.
 
 - No `compose.yaml`, serviço `searxng` (imagem `searxng/searxng` com tag de data fixa, `SEARXNG_SECRET:
   ${SEARXNG_SECRET:-}`, `SEARXNG_BASE_URL: http://searxng:8080/`, `FORCE_OWNERSHIP: "false"`, volume
