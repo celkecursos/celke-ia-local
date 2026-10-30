@@ -259,3 +259,27 @@ def test_old_sources_without_kind_still_load():
     source = Source(**json.loads('{"document_id": "d", "filename": "a.pdf", "page": 1, "excerpt": "t", "score": 0.5}'))
 
     assert source.kind == "document"
+
+
+def test_web_search_does_not_need_documents(client, model, web_search):
+    events = parse_sse(ask(client, "Qual é a capital da França?", [], web_search=True).text)
+
+    assert events[-1] == ("done", {})
+    assert web_search.queries == ["Qual é a capital da França?"]
+    assert len(model.chat_calls) == 1
+
+
+def test_question_about_documents_needs_a_document(client):
+    response = ask(client, "Pergunta?", [])
+
+    assert response.status_code == 422
+    assert "ao menos um documento" in response.json()["erro"]["mensagem"]
+
+
+def test_web_search_without_documents_keeps_the_ones_of_the_conversation(client, sample_pdf):
+    document_id = upload(client, sample_pdf)
+    conversation_id = parse_sse(ask(client, "Qual modelo é usado?", [document_id]).text)[0][1]["id"]
+
+    ask(client, "Pergunta?", [], web_search=True, conversation_id=conversation_id)
+
+    assert client.get(f"/api/conversations/{conversation_id}").json()["document_ids"] == [document_id]

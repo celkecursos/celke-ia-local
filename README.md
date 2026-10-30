@@ -39,8 +39,9 @@ Python nem Node.js e não há API paga.
   então recarregar a página continua nela); lista das conversas anteriores para reabrir; exclusão de
   conversa com confirmação.
 - **Busca na internet (opcional):** quando os PDFs não têm a resposta, o chat avisa e oferece o botão
-  **Pesquisar na internet**; as demais respostas têm o mesmo botão, discreto. Nada é pesquisado sem o
-  clique, e só a pergunta sai do computador. A resposta vem marcada como "Resposta da internet", com os
+  **Pesquisar na internet**; as demais respostas têm o mesmo botão, discreto. No campo da pergunta, o
+  menu **+** escolhe de onde vem a resposta (com **Busca na internet**, não é preciso selecionar
+  documento). Nada é pesquisado sem o clique, e só a pergunta sai do computador. A resposta vem marcada como "Resposta da internet", com os
   links das páginas como fontes. Usa o SearXNG, sem chave nem API paga.
 - **RAG:** extração com PyMuPDF página a página, divisão com sobreposição, embeddings no Ollama, vetores
   no ChromaDB com documento e página nos metadados, busca só nos documentos escolhidos e resposta baseada
@@ -183,7 +184,8 @@ docker compose start       # volta a rodar
    o download ainda não terminou (`docker compose logs -f ollama-init`).
 2. Em **Documentos**, escolha um ou mais PDFs e clique em **Enviar**. A tabela atualiza sozinha até a
    situação ficar **Pronto**. PDFs com erro mostram o motivo e podem ser reprocessados.
-3. Em **Chat** (ou no ícone de conversa da linha do documento), escolha os documentos e pergunte.
+3. Em **Chat** (ou no ícone de conversa da linha do documento), escolha os documentos, um a um ou com
+   **Selecionar todos**, e pergunte. Uma conversa reaberta começa sem documentos selecionados.
    A primeira pergunta demora mais: o modelo é carregado na memória. Enquanto o modelo raciocina,
    aparece "Analisando os trechos dos documentos…"; depois a resposta chega aos poucos.
 4. Abra **fontes** abaixo da resposta para ver de qual documento e página veio cada trecho.

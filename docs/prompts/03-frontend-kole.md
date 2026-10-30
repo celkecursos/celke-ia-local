@@ -108,9 +108,10 @@ vazio; ações por linha com `AcaoLinha`: Conversar (pronto → `/?doc=<id>`), R
 recarregada a cada 2 s **só enquanto** houver documento na fila ou processando.
 
 **Chat:** a conversa aberta fica na URL (`/?conversa=<id>`): ao recarregar ou escolher na lista, a
-página busca `/api/conversations/<id>` e mostra as mensagens gravadas (com as fontes e os erros) e
-seleciona os documentos da conversa; conversa inexistente → `Alerta` com botão "Nova conversa".
-`CampoSelectMultiplo` com os documentos de `/api/chat/documents` (com busca e botão limpar),
+página busca `/api/conversations/<id>` e mostra as mensagens gravadas (com as fontes e os erros), sem
+nenhum documento selecionado: a pessoa escolhe os da próxima pergunta; conversa inexistente → `Alerta` com botão "Nova conversa".
+`CampoSelectMultiplo` com os documentos de `/api/chat/documents` (com busca e botão limpar) e, ao lado, o
+botão "Selecionar todos",
 pré-selecionando os `?doc=` da URL e descartando os que não estão prontos. `CabecalhoPagina` com o
 título da conversa aberta (ou "Chat") e os botões "Conversas" (ícone `history`, abre um `Dialogo`
 `aparencia="lateral"` com uma `Lista` de `ItemLista`, título e data da última mensagem, a aberta
@@ -138,7 +139,9 @@ de conversas é recarregada.
 `answer_kind: "not_found"` ao reabrir a conversa), `Alerta` `info` no `rodape` com o título "Os documentos
 não têm essa resposta", o texto "Só a pergunta é enviada ao buscador. Os seus PDFs continuam no computador."
 e o botão "Pesquisar na internet" (ícone `globe`); nas outras, o mesmo botão pequeno e secundário em `acoes`.
-O clique repete a pergunta com `web_search: true`. Resposta da web com o nome "Celke IA · Resposta da internet"
+O clique repete a pergunta com `web_search: true`. No `acoesExtras` do `CampoMensagem`, `MenuSuspenso` com ícone `plus`, `semSeta`, `direcao="cima"` e os itens
+Documentos, Busca na internet e Enviar PDF; com a busca ligada, `Chip` removível ao lado (começa em Documentos e volta para ele ao trocar de conversa). Com a busca, a pergunta
+vai com `web_search: true` e não exige documento selecionado. Resposta da web com o nome "Celke IA · Resposta da internet"
 e `Referencias` com `href` e o domínio em `detalhe`. "Tentar novamente" mantém `web_search`. Em Status,
 linha do SearXNG.
 
