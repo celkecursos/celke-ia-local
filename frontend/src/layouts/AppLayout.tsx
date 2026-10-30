@@ -4,9 +4,9 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router';
 const NAV = [
   {
     itens: [
-      { rotulo: 'Painel', icone: 'house', rota: '/' },
+      { rotulo: 'Chat', icone: 'message-square', rota: '/' },
       { rotulo: 'Documentos', icone: 'file-text', rota: '/documentos' },
-      { rotulo: 'Chat', icone: 'message-square', rota: '/chat' },
+      { rotulo: 'Status', icone: 'activity', rota: '/status' },
     ],
   },
 ];

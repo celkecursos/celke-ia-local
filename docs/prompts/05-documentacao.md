@@ -10,7 +10,7 @@ no código.
 ## Tarefas
 
 1. **`README.md`** em português, com índice e as seções:
-   - **Funcionalidades**: painel, documentos, chat, RAG e proteções, como estão implementados;
+   - **Funcionalidades**: chat, documentos, status, RAG e proteções, como estão implementados;
    - **Arquitetura**: diagrama em texto (navegador → nginx → backend → Ollama, ChromaDB, PostgreSQL e `/data`),
      tabela dos serviços com a porta publicada (só o frontend, em `127.0.0.1:8090`), o fluxo de um PDF
      e o de uma pergunta, com os eventos do streaming e a gravação da conversa;

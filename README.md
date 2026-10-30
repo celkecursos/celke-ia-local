@@ -27,7 +27,7 @@ Python nem Node.js e não há API paga.
 
 ## Funcionalidades
 
-- **Painel:** documentos cadastrados, prontos, processando e com erro (números reais da API); estado do
+- **Status:** documentos cadastrados, prontos, processando e com erro (números reais da API); estado do
   backend, do Ollama, dos dois modelos, do ChromaDB e do PostgreSQL; atalhos para enviar PDF e conversar.
 - **Documentos:** envio de um ou vários PDFs com barra de progresso; validação de extensão, conteúdo
   (`%PDF-`) e tamanho; processamento em segundo plano com a situação na tabela (na fila, processando,
@@ -35,7 +35,7 @@ Python nem Node.js e não há API paga.
   os metadados e os vetores; reprocessamento; o mesmo PDF não entra duas vezes (SHA-256).
 - **Chat:** escolha de um ou mais documentos; resposta em streaming (aparece enquanto é gerada); botão
   parar; fontes de cada resposta (documento, página e trecho); tentar novamente em caso de erro; copiar
-  a resposta; conversas salvas no PostgreSQL (a conversa aberta fica no endereço `/chat?conversa=<id>`,
+  a resposta; conversas salvas no PostgreSQL (a conversa aberta fica no endereço `/?conversa=<id>`,
   então recarregar a página continua nela); lista das conversas anteriores para reabrir; exclusão de
   conversa com confirmação.
 - **RAG:** extração com PyMuPDF página a página, divisão com sobreposição, embeddings no Ollama, vetores
@@ -166,7 +166,7 @@ docker compose start       # volta a rodar
 
 ## Usar a aplicação
 
-1. No **Painel**, confira se todos os serviços estão verdes. Se algum modelo aparecer como ausente,
+1. Em **Status**, confira se todos os serviços estão verdes. Se algum modelo aparecer como ausente,
    o download ainda não terminou (`docker compose logs -f ollama-init`).
 2. Em **Documentos**, escolha um ou mais PDFs e clique em **Enviar**. A tabela atualiza sozinha até a
    situação ficar **Pronto**. PDFs com erro mostram o motivo e podem ser reprocessados.
@@ -365,7 +365,7 @@ o backend, `docker compose up -d --build backend`.
 
 | Sintoma | O que fazer |
 |---|---|
-| Modelo **ausente** no Painel | O download não terminou ou falhou: `docker compose logs ollama-init`. Para tentar de novo: `docker compose up ollama-init` |
+| Modelo **ausente** em Status | O download não terminou ou falhou: `docker compose logs ollama-init`. Para tentar de novo: `docker compose up ollama-init` |
 | "Ollama não tem memória suficiente" | Aumente a memória do Docker Desktop, feche outros programas ou use um modelo menor (`CHAT_MODEL=qwen3:1.7b`) |
 | A primeira resposta demora ou dá timeout | O modelo está sendo carregado; tente de novo. Em CPU, respostas longas levam dezenas de segundos. Aumente `OLLAMA_TIMEOUT_SECONDS` se precisar |
 | PDF com erro "não tem texto selecionável" | O PDF é uma imagem digitalizada. Esta versão não faz OCR |

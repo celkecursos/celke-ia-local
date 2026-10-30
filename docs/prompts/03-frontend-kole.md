@@ -55,22 +55,22 @@ com título "Celke IA Local" e um `public/logo.svg` simples (balão de conversa)
 
 ```
 src/main.tsx               importa '@celke/kole-react/estilos.css' e './styles.css'; registra os
-                           ícones bot, cpu, database e server do lucide-react com registrarIcones;
+                           ícones activity, bot, cpu, database e server do lucide-react com registrarIcones;
                            <ProvedorUi><RouterProvider router={router} /></ProvedorUi>
-src/router.tsx             createBrowserRouter: layout com '/', '/documentos', '/chat' e '*'
-src/layouts/AppLayout.tsx  Estrutura com marca "Celke IA Local" / "Chat com seus PDFs", menu Painel
-                           (house), Documentos (file-text) e Chat (message-square), rotaAtual,
+src/router.tsx             createBrowserRouter: layout com '/' (chat), '/documentos', '/status', '/chat' (redireciona para '/', mantendo a query string) e '*'
+src/layouts/AppLayout.tsx  Estrutura com marca "Celke IA Local" / "Chat com seus PDFs", menu Chat
+                           (message-square), Documentos (file-text) e Status (activity), rotaAtual,
                            aoNavegar, renderLink com o Link do React Router, busca={false}, rodapé
 src/types/api.ts           tipos das respostas da API e ChatEvent
 src/services/sse.ts        parseSseBlock e readSse (gerador assíncrono)
 src/services/api.ts        request() com ApiError, api.*, uploadDocument (XMLHttpRequest), streamChat
 src/hooks/usePolling.ts    carrega e repete enquanto `active`
 src/components/StatusLabel.tsx  DocumentStatusLabel e OnlineStatus (Status do Kole)
-src/pages/DashboardPage.tsx, DocumentsPage.tsx, ChatPage.tsx, NotFoundPage.tsx
+src/pages/ChatPage.tsx, DocumentsPage.tsx, StatusPage.tsx, NotFoundPage.tsx
 src/styles.css             ajustes de layout só com as variáveis do tema (nada de cor fixa)
 ```
 
-O conteúdo do Painel e de Documentos fica num `<div className="app-pagina">` (`display: flex`,
+O conteúdo de Status e de Documentos fica num `<div className="app-pagina">` (`display: flex`,
 `flex-direction: column`, `gap: 1rem`): os componentes do Kole não têm margem externa, e assim o espaço
 entre cabeçalho, alertas, indicadores e cards é sempre o mesmo. O contêiner do Chat usa o mesmo `gap`.
 
@@ -90,7 +90,7 @@ entre cabeçalho, alertas, indicadores e cards é sempre o mesmo. O contêiner d
 
 ## Telas
 
-**Painel:** `CabecalhoPagina` com botões "Enviar PDF" e "Iniciar conversa"; `Indicadores` com
+**Status:** `CabecalhoPagina` com botões "Enviar PDF" e "Iniciar conversa"; `Indicadores` com
 documentos cadastrados, prontos, processando e com erro (de `/api/documents/stats`, atualizando a cada
 5 s); `Alerta` de erro quando o Ollama estiver desconectado e de aviso quando um modelo ainda não
 estiver instalado (com o comando `docker compose logs -f ollama-init`); `Card` "Serviços" com backend,
@@ -102,12 +102,12 @@ a cada 10 s.
 que envia os arquivos um por um com `Progresso` e um toast por resultado. `Tabela` com Arquivo (nome
 e, abaixo, a mensagem de erro ou o aviso de reindexação), Tamanho (`formatBytes`), Páginas, Enviado em
 (`formatDataHoraBr`) e Situação (`Status`: Na fila, Processando, Pronto, Erro ou Reprocessar); estado
-vazio; ações por linha com `AcaoLinha`: Conversar (pronto → `/chat?doc=<id>`), Reprocessar (erro ou
+vazio; ações por linha com `AcaoLinha`: Conversar (pronto → `/?doc=<id>`), Reprocessar (erro ou
 `needs_reindex`) e Excluir (desabilitado enquanto processa, confirmação com
 `useConfirmacao().remover()` dizendo que os trechos indexados também serão removidos). A lista é
 recarregada a cada 2 s **só enquanto** houver documento na fila ou processando.
 
-**Chat:** a conversa aberta fica na URL (`/chat?conversa=<id>`): ao recarregar ou escolher na lista, a
+**Chat:** a conversa aberta fica na URL (`/?conversa=<id>`): ao recarregar ou escolher na lista, a
 página busca `/api/conversations/<id>` e mostra as mensagens gravadas (com as fontes e os erros) e
 seleciona os documentos da conversa; conversa inexistente → `Alerta` com botão "Nova conversa".
 `CampoSelectMultiplo` com os documentos de `/api/chat/documents` (com busca e botão limpar),
@@ -134,7 +134,7 @@ detalhe "Página N", trecho). Parar mantém o que já chegou (ou "Resposta inter
 grava o mesmo. O histórico não é enviado: o backend o lê da conversa. Depois de cada resposta, a lista
 de conversas é recarregada.
 
-**Não encontrada:** `Vazio` com botão para o painel.
+**Não encontrada:** `Vazio` com botão para o chat.
 
 ## Docker
 
@@ -170,6 +170,6 @@ curl -s http://127.0.0.1:8090/api/health                          # {"status":"o
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8090/documentos   # 200 (rota do React)
 ```
 
-Abra http://localhost:8090 e confira o menu, o painel com os serviços verdes, a página de documentos
+Abra http://localhost:8090 e confira o menu, a página de status com os serviços verdes, a de documentos
 e o chat, nos temas claro e escuro e numa janela estreita (celular). No chat, faça uma pergunta,
 confira o `?conversa=` na URL, recarregue a página (a conversa continua) e abra a lista de conversas.

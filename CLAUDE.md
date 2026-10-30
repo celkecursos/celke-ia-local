@@ -6,7 +6,7 @@ comandos e as variáveis de ambiente.
 | Pasta | Projeto | Stack |
 |---|---|---|
 | `backend/` | API, processamento dos PDFs, RAG e conversas | Python 3.13, FastAPI, Pydantic, PyMuPDF, Ollama, ChromaDB, PostgreSQL (psycopg 3) |
-| `frontend/` | Painel, documentos e chat | React 19, TypeScript, Vite, React Router, `@celke/kole-react` |
+| `frontend/` | Chat, documentos e status | React 19, TypeScript, Vite, React Router, `@celke/kole-react` |
 | raiz | Docker Compose, scripts de inicialização | Docker Compose |
 | `docs/prompts/` | Prompts que recriam o projeto do zero | Markdown |
 
