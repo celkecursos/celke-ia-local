@@ -8,7 +8,9 @@ comandos e as variáveis de ambiente.
 | `backend/` | API, processamento dos PDFs, RAG e conversas | Python 3.13, FastAPI, Pydantic, PyMuPDF, Ollama, ChromaDB, PostgreSQL (psycopg 3) |
 | `frontend/` | Chat, documentos e status | React 19, TypeScript, Vite, React Router, `@celke/kole-react` |
 | raiz | Docker Compose, scripts de inicialização | Docker Compose |
-| `docs/prompts/` | Prompts que recriam o projeto do zero | Markdown |
+| `prompts-iniciais/` | Prompts que recriam o projeto do zero, com o conteúdo exato dos arquivos (gerados) | Markdown |
+| `docs/prompts/` | As mesmas etapas descritas em texto, para o tutorial | Markdown |
+| `docs/gerador-prompts/` | Gera e confere `prompts-iniciais/` | Python |
 
 ## Branches e commits
 
@@ -77,3 +79,12 @@ comandos e as variáveis de ambiente.
 `docs/prompts/` recria o projeto do zero. Mudou algo que um prompt cria? Atualize o prompt da etapa
 correspondente no mesmo commit. Os prompts são escritos como originais: sem datas, sem histórico de
 correções e sem caminhos de outros projetos.
+
+`prompts-iniciais/` é gerado: não edite à mão. O texto das orientações fica em
+`docs/gerador-prompts/gerar_prompts.py`, e o conteúdo dos arquivos vem do próprio projeto. Mudou um arquivo?
+Gere de novo no mesmo commit e confira (o segundo comando precisa terminar com `diferentes 0`):
+
+```bash
+docker run --rm -v "${PWD}:/repo" -w /repo python:3.13-slim python docs/gerador-prompts/gerar_prompts.py
+docker run --rm -v "${PWD}:/repo" -w /repo python:3.13-slim python docs/gerador-prompts/testar_prompts.py
+```

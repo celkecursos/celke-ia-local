@@ -454,8 +454,10 @@ compose.dev.yaml       API publicada para o Vite em desenvolvimento
 
 ## Prompts para recriar o projeto
 
-[`docs/prompts/`](docs/prompts/README.md) tem os prompts que criam este projeto do zero com um agente
-de IA (Claude Code ou outro com acesso ao terminal), etapa por etapa ou numa execução só.
+[`prompts-iniciais/`](prompts-iniciais/README.md) tem os prompts que recriam este projeto do zero com um
+agente de IA (Claude Code ou outro com acesso ao terminal), com o conteúdo exato dos arquivos, a escolha do
+modelo pela capacidade do computador e orientações do que fazer em cada etapa.
+[`docs/prompts/`](docs/prompts/README.md) descreve as mesmas etapas em texto, para o tutorial.
 
 ## Licença
 

@@ -103,6 +103,52 @@
   min-height: 0;
 }
 
+/* Título da conversa em até 2 linhas; sem espaço ao lado dele, os botões descem para a linha de baixo. */
+.app-chat-cabecalho .lp-cab-topo {
+  flex-wrap: wrap;
+}
+
+.app-chat-cabecalho .lp-cab-titulos {
+  flex: 1 1 14rem;
+}
+
+.app-chat-cabecalho .lp-cab-titulo {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 40rem) {
+  .app-chat-cabecalho.lp-cab {
+    padding: 1rem;
+  }
+
+  .app-chat-cabecalho .lp-cab-topo {
+    gap: 0.75rem;
+  }
+
+  .app-chat-cabecalho .lp-cab-tile {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .app-chat-cabecalho .lp-cab-titulos {
+    flex-basis: 0;
+  }
+
+  .app-chat-cabecalho .lp-cab-titulo {
+    font-size: var(--fs-corpo);
+    font-weight: 700;
+  }
+
+  .app-chat-cabecalho .lp-cab-acoes {
+    flex-basis: 100%;
+  }
+}
+
 /* Botão "Selecionar todos" alinhado à caixa do campo, ao lado do rótulo e abaixo dele a dica. */
 .app-chat-documentos {
   display: flex;
