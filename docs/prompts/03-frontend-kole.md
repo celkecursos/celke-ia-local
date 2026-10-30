@@ -113,7 +113,7 @@ nenhum documento selecionado: a pessoa escolhe os da próxima pergunta; conversa
 `CampoSelectMultiplo` com os documentos de `/api/chat/documents` (com busca e botão limpar) e, ao lado, o
 botão "Selecionar todos",
 pré-selecionando os `?doc=` da URL e descartando os que não estão prontos. `CabecalhoPagina` com o
-título da conversa aberta (ou "Chat") e os botões "Conversas" (ícone `history`, abre um `Dialogo`
+título da conversa aberta (ou "Chat", em até 2 linhas e menor no celular, com os botões descendo para a linha de baixo quando faltar espaço) e os botões "Conversas" (ícone `history`, abre um `Dialogo`
 `aparencia="lateral"` com uma `Lista` de `ItemLista`, título e data da última mensagem, a aberta
 marcada como `ativo`, e `Vazio` quando não houver nenhuma), "Excluir" (só com conversa aberta;
 `useConfirmacao().remover()` dizendo que os documentos continuam) e "Nova conversa" (limpa a URL e as

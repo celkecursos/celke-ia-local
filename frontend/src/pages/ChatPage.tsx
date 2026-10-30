@@ -254,6 +254,7 @@ export function ChatPage() {
   return (
     <div className="app-chat">
       <CabecalhoPagina
+        className="app-chat-cabecalho"
         titulo={current?.title ?? 'Chat'}
         icone="message-square"
         acoes={
