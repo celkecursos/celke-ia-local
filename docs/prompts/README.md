@@ -34,7 +34,7 @@ para o próximo.
 |---|---|---|
 | 1 | [Estrutura inicial e Docker](01-estrutura-e-docker.md) | Pastas, `compose.yaml` com Ollama, ChromaDB, PostgreSQL e download dos modelos, `.env.example`, `.gitignore`, licença |
 | 2 | [Backend Python e RAG](02-backend-e-rag.md) | API FastAPI, PDFs, trechos, embeddings, ChromaDB, chat com streaming, conversas no PostgreSQL, testes unitários |
-| 3 | [Frontend React com o Kole](03-frontend-kole.md) | Painel, documentos e chat com conversas salvas, com o `@celke/kole-react`, nginx com proxy da API |
+| 3 | [Frontend React com o Kole](03-frontend-kole.md) | Chat, documentos e status, com conversas salvas, com o `@celke/kole-react`, nginx com proxy da API |
 | 4 | [Integração ponta a ponta](04-integracao.md) | Scripts de inicialização, teste de integração com os modelos reais, persistência |
 | 5 | [Documentação e guia para agentes](05-documentacao.md) | `README.md` completo e `CLAUDE.md` |
 

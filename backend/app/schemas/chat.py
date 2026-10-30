@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -13,14 +15,22 @@ class ChatRequest(BaseModel):
         default=False,
         description="Gera de novo a última resposta da conversa, que terminou em erro, sem repetir a pergunta.",
     )
+    web_search: bool = Field(
+        default=False,
+        description="Responde com a busca na internet, e não com os documentos. Só a pergunta sai do computador.",
+    )
 
 
 class Source(BaseModel):
-    document_id: str
+    """Trecho usado na resposta. Na web, `filename` é o título da página e não há documento nem número de página."""
+
+    kind: Literal["document", "web"] = "document"
+    document_id: str | None = None
     filename: str
-    page: int
+    page: int | None = None
+    url: str | None = None
     excerpt: str
-    score: float
+    score: float | None = None
 
 
 class ChatDocument(BaseModel):

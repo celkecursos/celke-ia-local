@@ -53,6 +53,8 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE INDEX IF NOT EXISTS messages_conversation_idx ON messages (conversation_id, seq);
+
+ALTER TABLE messages ADD COLUMN IF NOT EXISTS answer_kind TEXT NOT NULL DEFAULT 'documents';
 """
 
 

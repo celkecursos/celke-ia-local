@@ -8,17 +8,20 @@ if ! docker info > /dev/null 2>&1; then
   exit 1
 fi
 
-# Senha do PostgreSQL: gerada uma vez e guardada no .env (o banco guarda a senha da primeira subida).
-if ! grep -qs '^POSTGRES_PASSWORD=..*' .env; then
-  password=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')
-  if [ -f .env ]; then
-    grep -v '^POSTGRES_PASSWORD=' .env > .env.tmp || true
-    mv .env.tmp .env
+# Senha do PostgreSQL e chave do SearXNG: geradas uma vez e guardadas no .env (o banco guarda a senha
+# da primeira subida).
+for name in POSTGRES_PASSWORD SEARXNG_SECRET; do
+  if ! grep -qs "^$name=..*" .env; then
+    value=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')
+    if [ -f .env ]; then
+      grep -v "^$name=" .env > .env.tmp || true
+      mv .env.tmp .env
+    fi
+    printf '%s=%s\n' "$name" "$value" >> .env
+    chmod 600 .env
+    echo "$name criada no arquivo .env (guarde o arquivo; não o envie ao git)."
   fi
-  printf 'POSTGRES_PASSWORD=%s\n' "$password" >> .env
-  chmod 600 .env
-  echo "Senha do banco de dados criada no arquivo .env (guarde o arquivo; não o envie ao git)."
-fi
+done
 
 echo "Subindo os serviços (a primeira vez constrói as imagens e pode levar alguns minutos)..."
 docker compose up -d --build

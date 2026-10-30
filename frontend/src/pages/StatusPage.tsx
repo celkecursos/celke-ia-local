@@ -4,7 +4,7 @@ import { OnlineStatus } from '../components/StatusLabel';
 import { usePolling } from '../hooks/usePolling';
 import { api } from '../services/api';
 
-export function DashboardPage() {
+export function StatusPage() {
   const navigate = useNavigate();
   const stats = usePolling(api.stats, 5000);
   const status = usePolling(api.status, 10000);
@@ -14,16 +14,16 @@ export function DashboardPage() {
   return (
     <div className="app-pagina">
       <CabecalhoPagina
-        titulo="Painel"
-        icone="house"
+        titulo="Status"
+        icone="activity"
         acoes={
           <>
             <Botao rotulo="Enviar PDF" icone="upload" onClick={() => navigate('/documentos')} />
-            <Botao rotulo="Iniciar conversa" icone="message-square" severidade="secundario" onClick={() => navigate('/chat')} />
+            <Botao rotulo="Iniciar conversa" icone="message-square" severidade="secundario" onClick={() => navigate('/')} />
           </>
         }
       >
-        Envie PDFs e faça perguntas sobre eles. As respostas são geradas por um modelo de IA rodando no seu computador.
+        Situação dos documentos e dos serviços. As respostas são geradas por um modelo de IA rodando no seu computador.
       </CabecalhoPagina>
 
       {stats.error && <Alerta severidade="err" titulo="Não foi possível carregar os números" mensagem={stats.error.message} />}
@@ -102,6 +102,10 @@ export function DashboardPage() {
             <li>
               <span>PostgreSQL (documentos e conversas)</span>
               <OnlineStatus online={!!s?.database.online} rotulo={s ? undefined : 'Verificando'} />
+            </li>
+            <li>
+              <span>SearXNG (busca na internet, só quando você pede)</span>
+              <OnlineStatus online={!!s?.web_search.online} rotulo={s ? undefined : 'Verificando'} />
             </li>
           </ul>
         )}

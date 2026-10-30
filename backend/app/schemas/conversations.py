@@ -7,6 +7,8 @@ from app.schemas.chat import Source
 
 MessageRole = Literal["user", "assistant"]
 MessageState = Literal["concluida", "erro"]
+# documents = veio dos PDFs; not_found = os PDFs não tinham a resposta; web = veio da busca na internet
+AnswerKind = Literal["documents", "not_found", "web"]
 
 
 class Message(BaseModel):
@@ -16,6 +18,7 @@ class Message(BaseModel):
     state: MessageState
     error_message: str | None = None
     sources: list[Source] = []
+    answer_kind: AnswerKind = "documents"
     created_at: datetime
 
 

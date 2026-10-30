@@ -27,7 +27,7 @@ Python nem Node.js e não há API paga.
 
 ## Funcionalidades
 
-- **Painel:** documentos cadastrados, prontos, processando e com erro (números reais da API); estado do
+- **Status:** documentos cadastrados, prontos, processando e com erro (números reais da API); estado do
   backend, do Ollama, dos dois modelos, do ChromaDB e do PostgreSQL; atalhos para enviar PDF e conversar.
 - **Documentos:** envio de um ou vários PDFs com barra de progresso; validação de extensão, conteúdo
   (`%PDF-`) e tamanho; processamento em segundo plano com a situação na tabela (na fila, processando,
@@ -35,15 +35,19 @@ Python nem Node.js e não há API paga.
   os metadados e os vetores; reprocessamento; o mesmo PDF não entra duas vezes (SHA-256).
 - **Chat:** escolha de um ou mais documentos; resposta em streaming (aparece enquanto é gerada); botão
   parar; fontes de cada resposta (documento, página e trecho); tentar novamente em caso de erro; copiar
-  a resposta; conversas salvas no PostgreSQL (a conversa aberta fica no endereço `/chat?conversa=<id>`,
+  a resposta; conversas salvas no PostgreSQL (a conversa aberta fica no endereço `/?conversa=<id>`,
   então recarregar a página continua nela); lista das conversas anteriores para reabrir; exclusão de
   conversa com confirmação.
+- **Busca na internet (opcional):** quando os PDFs não têm a resposta, o chat avisa e oferece o botão
+  **Pesquisar na internet**; as demais respostas têm o mesmo botão, discreto. Nada é pesquisado sem o
+  clique, e só a pergunta sai do computador. A resposta vem marcada como "Resposta da internet", com os
+  links das páginas como fontes. Usa o SearXNG, sem chave nem API paga.
 - **RAG:** extração com PyMuPDF página a página, divisão com sobreposição, embeddings no Ollama, vetores
   no ChromaDB com documento e página nos metadados, busca só nos documentos escolhidos e resposta baseada
   nos trechos. Sem trechos relevantes, o sistema diz que não encontrou a informação em vez de inventar.
 - **Proteções:** o conteúdo dos PDFs é tratado como dado não confiável (instruções dentro do PDF não
   mudam as regras do assistente), arquivos gravados com nome interno, CORS desligado, Ollama, ChromaDB e
-  PostgreSQL sem portas publicadas.
+  PostgreSQL e SearXNG sem portas publicadas.
 
 ## Arquitetura
 
@@ -52,6 +56,7 @@ Navegador ──► frontend (nginx :8090) ──/api──► backend (FastAPI 
               React + Kole React                 │                            qwen3:4b, nomic-embed-text
                                                  ├──► chroma (:8000)  vetores dos trechos
                                                  ├──► postgres (:5432) documentos, conversas, mensagens
+                                                 ├──► searxng (:8080) busca na internet, só com o clique
                                                  └──► /data           arquivos PDF
 ```
 
@@ -63,6 +68,7 @@ Navegador ──► frontend (nginx :8090) ──/api──► backend (FastAPI 
 | `ollama-init` | Baixa os modelos que faltam e termina | nenhuma |
 | `chroma` | Banco vetorial persistente | nenhuma |
 | `postgres` | Metadados dos documentos, conversas e mensagens | nenhuma |
+| `searxng` | Busca na internet, usada só quando a pessoa clica no botão | nenhuma |
 
 Os containers conversam pelos nomes dos serviços na rede do Docker.
 
@@ -75,7 +81,13 @@ próximos dos documentos escolhidos → contexto entre `<documentos>` → modelo
 `conversation`, `sources`, `thinking`, `token`, `done` ou `error` (Server-Sent Events). A pergunta é
 gravada na conversa antes do streaming e a resposta no fim (com as fontes, com o erro ou, se a pessoa
 parar, com o que já tinha chegado). O histórico enviado ao modelo são as últimas
-`HISTORY_MAX_MESSAGES` mensagens concluídas da conversa, lidas do banco.
+`HISTORY_MAX_MESSAGES` mensagens concluídas da conversa, lidas do banco. Se o modelo disser que não
+encontrou a resposta, o evento `not_found` vem antes do `done`.
+
+Fluxo da busca na internet (só com o clique, `web_search: true`): evento `searching` → a pergunta vai ao
+SearXNG → o backend lê o texto das primeiras `WEB_SEARCH_MAX_RESULTS` páginas (recusando endereços
+internos e cortando em `WEB_PAGE_MAX_CHARS` caracteres; sem texto, usa o resumo do buscador) → contexto
+entre `<resultados_web>`, sem os PDFs e sem o histórico → modelo de chat → resposta com fontes `web`.
 
 ## Tecnologias
 
@@ -87,6 +99,7 @@ parar, com o que já tinha chegado). O histórico enviado ao modelo são as últ
 | Banco vetorial | ChromaDB 1.5.9 |
 | Banco de dados | PostgreSQL 18.6 |
 | Testes | pytest, Ruff, Vitest, `tsc` |
+| Busca na internet | SearXNG, trafilatura |
 | Infraestrutura | Docker Compose |
 
 ## Requisitos
@@ -101,7 +114,7 @@ parar, com o que já tinha chegado). O histórico enviado ao modelo são as últ
   funcionam no PowerShell, exceto onde há um bloco próprio para ele.
 - **Disco:** cerca de 6 GB (imagens e modelos).
 - **Internet na primeira execução:** para baixar as imagens e os modelos. Depois disso, a aplicação
-  funciona sem internet.
+  funciona sem internet; só o botão **Pesquisar na internet** precisa de conexão.
 
 ## Executar com Docker
 
@@ -141,8 +154,8 @@ O script confere o Docker, constrói as imagens, sobe os serviços, espera o `ol
 modelos que faltam (cerca de 3 GB, só na primeira vez), confere a API e mostra o endereço. Pode rodar de
 novo quantas vezes quiser: o que já existe não é baixado de novo.
 
-Sem o script, o mesmo resultado em qualquer sistema, desde que o `.env` tenha `POSTGRES_PASSWORD`
-preenchido (sem senha o `postgres` não sobe):
+Sem o script, o mesmo resultado em qualquer sistema, desde que o `.env` tenha `POSTGRES_PASSWORD` (sem
+senha o `postgres` não sobe) e `SEARXNG_SECRET` preenchidos:
 
 ```bash
 docker compose up -d --build
@@ -166,7 +179,7 @@ docker compose start       # volta a rodar
 
 ## Usar a aplicação
 
-1. No **Painel**, confira se todos os serviços estão verdes. Se algum modelo aparecer como ausente,
+1. Em **Status**, confira se todos os serviços estão verdes. Se algum modelo aparecer como ausente,
    o download ainda não terminou (`docker compose logs -f ollama-init`).
 2. Em **Documentos**, escolha um ou mais PDFs e clique em **Enviar**. A tabela atualiza sozinha até a
    situação ficar **Pronto**. PDFs com erro mostram o motivo e podem ser reprocessados.
@@ -174,6 +187,8 @@ docker compose start       # volta a rodar
    A primeira pergunta demora mais: o modelo é carregado na memória. Enquanto o modelo raciocina,
    aparece "Analisando os trechos dos documentos…"; depois a resposta chega aos poucos.
 4. Abra **fontes** abaixo da resposta para ver de qual documento e página veio cada trecho.
+   Se os documentos não tiverem a resposta, clique em **Pesquisar na internet**: a mesma pergunta é
+   respondida com páginas da web, e as fontes viram links. Confira as informações nos sites.
 5. A conversa é salva a cada pergunta. **Conversas** lista as anteriores (a mais recente primeiro),
    **Nova conversa** começa outra e **Excluir** apaga a conversa aberta (os documentos continuam).
 
@@ -222,6 +237,10 @@ execute `docker compose up -d` (ou o script de novo).
 | `HISTORY_MAX_MESSAGES` | `6` | Mensagens anteriores da conversa enviadas junto com a pergunta |
 | `POSTGRES_PASSWORD` | (vazio) | Senha do PostgreSQL, obrigatória; os scripts geram uma aleatória. Vale só na criação do volume |
 | `POSTGRES_DB` / `POSTGRES_USER` | `celke_ia_local` / `celke` | Nome do banco e do usuário (também só na criação do volume) |
+| `SEARXNG_SECRET` | (vazio) | Chave interna do SearXNG, obrigatória; os scripts geram uma aleatória |
+| `WEB_SEARCH_TIMEOUT_SECONDS` | `15` | Tempo máximo da busca e da leitura de cada página |
+| `WEB_SEARCH_MAX_RESULTS` | `3` | Páginas lidas por pesquisa |
+| `WEB_PAGE_MAX_CHARS` | `2000` | Texto de cada página enviado ao modelo; mais texto, mais memória |
 | `MAX_UPLOAD_MB` | `25` | Tamanho máximo de cada PDF |
 | `OLLAMA_KEEP_ALIVE` | `30m` | Tempo que o modelo fica na memória depois da última pergunta |
 
@@ -272,6 +291,7 @@ docker compose --profile test run --rm --build backend-tests pytest -m integrati
 | `tests/unit/test_chat.py` | Streaming, fontes, só os documentos escolhidos, sem contexto, histórico da conversa, raciocínio fora da resposta, erros do modelo |
 | `tests/unit/test_conversations.py` | Conversa criada na primeira pergunta, mensagens e fontes gravadas, título, tentar de novo só após erro, resposta interrompida, exclusão, conversa depois de excluir o documento, importação do SQLite antigo |
 | `tests/unit/test_ollama_service.py` | Modelo ausente, conexão recusada, timeout, memória insuficiente, raciocínio separado |
+| `tests/unit/test_web_search.py` | Busca só quando pedida, só a pergunta enviada, páginas lidas e cortadas, endereços internos e redirecionamentos bloqueados, fontes web, `not_found`, erro e nova tentativa |
 | `tests/integration/test_full_flow.py` | Fluxo completo com Ollama, ChromaDB e PostgreSQL reais |
 | `frontend/src/services/sse.test.ts` | Leitura do streaming (blocos partidos, `\r\n`) |
 
@@ -283,6 +303,7 @@ docker compose logs -f backend            # logs da API e do processamento dos P
 docker compose logs -f ollama ollama-init # logs do Ollama e do download dos modelos
 docker compose logs --tail 100 frontend   # logs do nginx
 docker compose logs postgres              # logs do banco de dados
+docker compose logs searxng               # logs da busca na internet
 docker compose exec postgres psql -U celke celke_ia_local   # console SQL (\dt lista as tabelas)
 docker compose exec ollama ollama list    # modelos instalados
 docker compose exec ollama ollama ps      # modelo carregado na memória agora
@@ -365,7 +386,7 @@ o backend, `docker compose up -d --build backend`.
 
 | Sintoma | O que fazer |
 |---|---|
-| Modelo **ausente** no Painel | O download não terminou ou falhou: `docker compose logs ollama-init`. Para tentar de novo: `docker compose up ollama-init` |
+| Modelo **ausente** em Status | O download não terminou ou falhou: `docker compose logs ollama-init`. Para tentar de novo: `docker compose up ollama-init` |
 | "Ollama não tem memória suficiente" | Aumente a memória do Docker Desktop, feche outros programas ou use um modelo menor (`CHAT_MODEL=qwen3:1.7b`) |
 | A primeira resposta demora ou dá timeout | O modelo está sendo carregado; tente de novo. Em CPU, respostas longas levam dezenas de segundos. Aumente `OLLAMA_TIMEOUT_SECONDS` se precisar |
 | PDF com erro "não tem texto selecionável" | O PDF é uma imagem digitalizada. Esta versão não faz OCR |
@@ -378,6 +399,8 @@ o backend, `docker compose up -d --build backend`.
 | Mudou o modelo de embeddings e os documentos sumiram do chat | Reprocesse cada documento em **Documentos** |
 | `postgres` não sobe: "superuser password is not specified" | Falta `POSTGRES_PASSWORD` no `.env`. Rode o script de inicialização (cria a senha) ou preencha à mão |
 | Backend reinicia em loop com "password authentication failed" | O `.env` tem uma senha diferente da usada na criação do banco. Volte a senha antiga ou, para começar do zero, apague o volume `celke-ia-local_postgres-data` (perde documentos e conversas) |
+| "A busca na internet não está disponível" | Sem conexão ou SearXNG fora do ar: confira **Status** e `docker compose logs searxng`. O chat com os documentos continua funcionando |
+| A busca não traz resultados | Os buscadores podem limitar pedidos automáticos. Espere alguns minutos e tente de novo |
 | "O banco de dados (PostgreSQL) não está respondendo" | `docker compose ps postgres` e `docker compose logs postgres` |
 
 ## Hardware e limitações
@@ -386,6 +409,9 @@ o backend, `docker compose up -d --build backend`.
   computadores mais simples são mais lentos. Com GPU NVIDIA, a resposta é várias vezes mais rápida.
 - O `qwen3:4b` raciocina antes de responder; a resposta começa depois de alguns segundos.
 - Não há OCR: PDFs digitalizados como imagem não são lidos.
+- A busca na internet soma alguns segundos à resposta e lê só o começo de cada página, então a resposta
+  pode não estar no trecho lido. O aviso de "não encontrei" depende do que o modelo responde; se ele
+  errar, as demais respostas continuam com o botão de pesquisa.
 - Só a última resposta, quando dá erro, pode ser gerada de novo; as conversas não têm busca nem renomeação.
 - Um PDF é processado por vez; os demais aguardam na fila.
 
@@ -394,14 +420,18 @@ o backend, `docker compose up -d --build backend`.
 A aplicação foi feita para uso local, num computador pessoal. **Não a publique na internet como está:**
 não há login, e qualquer pessoa com acesso ao endereço pode enviar, ler e apagar documentos.
 
-- Só a porta do frontend é publicada, e apenas em `127.0.0.1`. O Ollama, o ChromaDB e o PostgreSQL não
-  têm porta no host.
+- Só a porta do frontend é publicada, e apenas em `127.0.0.1`. O Ollama, o ChromaDB, o PostgreSQL e o
+  SearXNG não têm porta no host.
 - A senha do PostgreSQL fica só no `.env` (fora do git), gerada aleatoriamente pelos scripts.
 - `APP_BIND=0.0.0.0` abre a aplicação para a rede local; use só em rede confiável.
 - Os arquivos são gravados com um identificador interno (o nome enviado nunca vira caminho), com limite
   de tamanho e verificação do conteúdo.
 - O texto dos PDFs vai ao modelo como dado, e o prompt de sistema manda ignorar instruções que apareçam
   nele. O modelo não executa comandos nem acessa arquivos.
+- **Busca na internet:** a pergunta vai aos buscadores (DuckDuckGo, Brave, Mojeek e Wikipedia) por meio
+  do SearXNG, então não pesquise dados sigilosos. O conteúdo dos PDFs nunca é enviado. O texto das
+  páginas é dado não confiável, e o backend só abre endereços públicos em http(s), nas portas 80 e 443,
+  conferindo cada redirecionamento, para que um site não o faça acessar os containers ou a rede local.
 - O CORS fica desligado: o navegador acessa a API pelo nginx, na mesma origem.
 - Os containers do backend rodam com usuário sem privilégios; nenhum usa modo privilegiado.
 
@@ -412,6 +442,7 @@ backend/     API FastAPI: app/api (rotas), core (configuração, erros), schemas
              (PDF, trechos, Ollama, documentos, conversas, RAG), repositories (PostgreSQL,
              ChromaDB) e tests/
 frontend/    React + Vite com o Kole React: layouts, pages, services (API e streaming), hooks; nginx
+searxng/     Configuração da busca na internet
 scripts/     iniciar.sh (Linux e macOS) e iniciar.ps1 (Windows)
 docs/        Prompts para recriar o projeto do zero
 compose.yaml           Serviços, volumes e perfis de teste

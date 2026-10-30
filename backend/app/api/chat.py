@@ -27,9 +27,10 @@ def chat_documents(c: ContainerDep) -> ChatDocumentList:
     summary="Pergunta sobre os documentos (streaming)",
     description=(
         "Resposta em Server-Sent Events. Eventos: `conversation` (`{id, title}`, a conversa em que a pergunta "
-        "foi gravada), `sources` (lista de trechos recuperados), `thinking` (o modelo está raciocinando; enviado "
-        "uma vez), `token` (`{text}`, pedaço da resposta), `done` (fim) e `error` (`{codigo, mensagem}`). "
-        "A pergunta e a resposta ficam gravadas na conversa."
+        "foi gravada), `searching` (busca na internet em andamento, com `web_search`), `sources` (lista de trechos "
+        "recuperados), `thinking` (o modelo está raciocinando; enviado uma vez), `token` (`{text}`, pedaço da "
+        "resposta), `not_found` (os documentos não tinham a resposta), `done` (fim) e `error` "
+        "(`{codigo, mensagem}`). A pergunta e a resposta ficam gravadas na conversa."
     ),
     response_class=StreamingResponse,
     responses={200: {"content": {"text/event-stream": {}}}},

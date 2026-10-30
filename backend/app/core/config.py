@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     retrieval_top_k: int = 5
     history_max_messages: int = 6
 
+    # Busca na internet: só acontece quando a pessoa clica em "Pesquisar na internet".
+    searxng_url: str = "http://searxng:8080"
+    web_search_timeout_seconds: float = 15.0
+    web_search_max_results: int = 3
+    web_page_max_chars: int = 2000
+
     # Vazio = sem CORS (o navegador acessa a API pelo proxy do frontend, na mesma origem).
     cors_origins: str = ""
 

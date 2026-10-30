@@ -169,7 +169,7 @@ export function DocumentsPage() {
           acoes={(d) => (
             <>
               {d.status === 'pronto' && !d.needs_reindex && (
-                <AcaoLinha icone="message-square" rotulo="Conversar" severidade="pri" onClick={() => navigate(`/chat?doc=${d.id}`)} />
+                <AcaoLinha icone="message-square" rotulo="Conversar" severidade="pri" onClick={() => navigate(`/?doc=${d.id}`)} />
               )}
               {(d.status === 'erro' || d.needs_reindex) && (
                 <AcaoLinha icone="refresh-cw" rotulo="Reprocessar" carregando={busyId === d.id} onClick={() => reprocess(d)} />

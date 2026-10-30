@@ -12,7 +12,7 @@ from app.repositories.document_repository import DocumentRepository
 from app.services.conversation_service import ConversationService
 from app.services.document_service import DocumentService
 from app.services.rag_service import RagService
-from tests.fakes import FakeModel, ImmediateExecutor, InMemoryVectorStore, make_pdf
+from tests.fakes import FakeModel, FakeWebSearch, ImmediateExecutor, InMemoryVectorStore, make_pdf
 
 
 class FakeOllamaStatus:
@@ -63,7 +63,12 @@ def vectors() -> InMemoryVectorStore:
 
 
 @pytest.fixture
-def container(settings, database, model, vectors) -> Container:
+def web_search() -> FakeWebSearch:
+    return FakeWebSearch()
+
+
+@pytest.fixture
+def container(settings, database, model, vectors, web_search) -> Container:
     repository = DocumentRepository(database)
     conversations = ConversationRepository(database)
     executor = ImmediateExecutor()
@@ -75,8 +80,9 @@ def container(settings, database, model, vectors) -> Container:
         ollama=FakeOllamaStatus(),  # type: ignore[arg-type]
         documents=DocumentService(settings, repository, vectors, model, executor),
         conversations=ConversationService(conversations),
-        rag=RagService(settings, repository, conversations, vectors, model),
+        rag=RagService(settings, repository, conversations, vectors, model, web_search),
         executor=executor,  # type: ignore[arg-type]
+        web_search=web_search,
     )
 
 

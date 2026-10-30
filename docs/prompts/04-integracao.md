@@ -12,7 +12,7 @@ completo: envio, indexação, pergunta, fontes, exclusão e persistência depois
    - vai para a raiz do projeto; se `docker info` falhar, explica que o Docker não está rodando e sai;
    - se o `.env` não tiver `POSTGRES_PASSWORD` preenchido, gera uma senha aleatória
      (`od -An -N24 -tx1 /dev/urandom | tr -d ' \n'`), troca a linha vazia (ou cria o arquivo), aplica
-     `chmod 600 .env` e avisa que a senha foi criada no `.env` (a senha vale só na criação do volume,
+     `chmod 600 .env` e avisa que a senha foi criada no `.env` (o mesmo para `SEARXNG_SECRET`) (a senha vale só na criação do volume,
      então nunca é trocada se já existir);
    - `docker compose up -d --build`;
    - avisa que os modelos são baixados só na primeira vez (cerca de 3 GB) e como acompanhar
@@ -27,7 +27,7 @@ completo: envio, indexação, pergunta, fontes, exclusão e persistência depois
 2. **`scripts/iniciar.ps1`** (Windows PowerShell) com o mesmo fluxo e as mesmas mensagens, sem acentos
    (o console do Windows pode não exibi-los). Use `$ErrorActionPreference = 'Continue'` e confira as
    falhas pelo `$LASTEXITCODE`: no PowerShell 5.1, com `Stop`, um aviso do Docker no stderr vira erro
-   fatal em `docker info *> $null`. A senha vem de
+   fatal em `docker info *> $null`. A senha e a chave vêm de
    `[System.Security.Cryptography.RandomNumberGenerator]`, o `.env` é lido com
    `Get-Content -Encoding UTF8` e gravado com `[System.IO.File]::WriteAllLines` (UTF-8 sem BOM, que o
    Docker Compose lê). Uso:

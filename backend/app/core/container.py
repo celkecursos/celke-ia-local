@@ -10,6 +10,7 @@ from app.services.conversation_service import ConversationService
 from app.services.document_service import DocumentService
 from app.services.ollama_service import OllamaService
 from app.services.rag_service import RagService
+from app.services.web_search import SearxngSearch, WebSearch
 
 
 @dataclass
@@ -25,6 +26,7 @@ class Container:
     conversations: ConversationService
     rag: RagService
     executor: ThreadPoolExecutor
+    web_search: WebSearch
 
 
 def build_container(settings: Settings) -> Container:
@@ -45,5 +47,13 @@ def build_container(settings: Settings) -> Container:
     executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="indexer")
     documents = DocumentService(settings, repository, vector_store, ollama, executor)
     conversations = ConversationService(conversation_repository)
-    rag = RagService(settings, repository, conversation_repository, vector_store, ollama)
-    return Container(settings, database, repository, vector_store, ollama, documents, conversations, rag, executor)
+    web_search = SearxngSearch(
+        settings.searxng_url,
+        timeout=settings.web_search_timeout_seconds,
+        max_results=settings.web_search_max_results,
+        page_max_chars=settings.web_page_max_chars,
+    )
+    rag = RagService(settings, repository, conversation_repository, vector_store, ollama, web_search)
+    return Container(
+        settings, database, repository, vector_store, ollama, documents, conversations, rag, executor, web_search
+    )

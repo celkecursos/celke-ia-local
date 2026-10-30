@@ -19,7 +19,24 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { usePolling } from '../hooks/usePolling';
 import { ApiError, api, streamChat } from '../services/api';
-import type { Source, StoredMessage } from '../types/api';
+import type { AnswerKind, Source, StoredMessage } from '../types/api';
+
+const WEB_SEARCH_NOTICE = 'Só a pergunta é enviada ao buscador. Os seus PDFs continuam no computador.';
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+function toReference(s: Source, i: number) {
+  const base = { id: `${s.document_id ?? s.url}-${i}`, titulo: `[${i + 1}] ${s.filename}`, trecho: s.excerpt };
+  return s.kind === 'web' && s.url
+    ? { ...base, detalhe: hostOf(s.url), href: s.url }
+    : { ...base, detalhe: `Página ${s.page}` };
+}
 
 interface ChatMessage {
   id: string;
@@ -29,6 +46,9 @@ interface ChatMessage {
   sources?: Source[];
   /** O modelo está raciocinando antes de responder. */
   thinking?: boolean;
+  /** A busca na internet está em andamento. */
+  searching?: boolean;
+  answerKind?: AnswerKind;
   error?: string;
   createdAt: Date;
 }
@@ -42,6 +62,7 @@ function fromStored(m: StoredMessage): ChatMessage {
     content: m.content,
     state: m.state,
     sources: m.sources,
+    answerKind: m.answer_kind,
     error: m.error_message ?? undefined,
     createdAt: new Date(m.created_at),
   };
@@ -116,7 +137,7 @@ export function ChatPage() {
     );
   }
 
-  async function ask(question: string, assistantId: string, retry = false) {
+  async function ask(question: string, assistantId: string, retry = false, webSearch = false) {
     const controller = new AbortController();
     abortRef.current = controller;
     const body = {
@@ -124,6 +145,7 @@ export function ChatPage() {
       document_ids: selectedIds,
       conversation_id: currentRef.current ?? undefined,
       retry,
+      web_search: webSearch,
     };
     try {
       for await (const event of streamChat(body, controller.signal)) {
@@ -134,7 +156,9 @@ export function ChatPage() {
             currentRef.current = event.id;
             setParams({ conversa: event.id }, { replace: true });
           }
-        } else if (event.type === 'sources') patch(assistantId, { sources: event.sources });
+        } else if (event.type === 'searching') patch(assistantId, { searching: true });
+        else if (event.type === 'sources') patch(assistantId, { sources: event.sources, searching: false });
+        else if (event.type === 'not_found') patch(assistantId, { answerKind: 'not_found' });
         else if (event.type === 'thinking') patch(assistantId, { thinking: true });
         else if (event.type === 'token') patch(assistantId, (m) => ({ content: m.content + event.text }));
         else if (event.type === 'error') {
@@ -161,17 +185,30 @@ export function ChatPage() {
     }
   }
 
-  function send(question: string) {
+  function send(question: string, webSearch = false) {
     if (!selectedIds.length || generating) return;
     const assistantId = newId();
     const now = new Date();
     setMessages((list) => [
       ...list,
       { id: newId(), role: 'user', content: question, state: 'concluida', createdAt: now },
-      { id: assistantId, role: 'assistant', content: '', state: 'gerando', createdAt: now },
+      {
+        id: assistantId,
+        role: 'assistant',
+        content: '',
+        state: 'gerando',
+        answerKind: webSearch ? 'web' : 'documents',
+        createdAt: now,
+      },
     ]);
-    setText('');
-    void ask(question, assistantId);
+    if (!webSearch) setText('');
+    void ask(question, assistantId, false, webSearch);
+  }
+
+  /** A pessoa pediu: repete a pergunta da resposta na busca na internet. */
+  function searchWeb(index: number) {
+    const question = messages[index - 1]?.content;
+    if (question) send(question, true);
   }
 
   /** Só a última resposta, que deu erro: o backend refaz a mesma pergunta. */
@@ -179,7 +216,7 @@ export function ChatPage() {
     const question = [...messages].reverse().find((m) => m.role === 'user')?.content;
     if (!question || generating) return;
     patch(message.id, { state: 'gerando', content: '', thinking: false, error: undefined, sources: undefined });
-    void ask(question, message.id, true);
+    void ask(question, message.id, true, message.answerKind === 'web');
   }
 
   function openConversation(id: string | null) {
@@ -304,7 +341,7 @@ export function ChatPage() {
         <>
           <CampoSelectMultiplo
             rotulo="Documentos da conversa"
-            dica="As respostas usam só os trechos dos documentos escolhidos."
+            dica="As respostas usam só os documentos escolhidos, a não ser que você peça para pesquisar na internet."
             placeholder={documents.loading ? 'Carregando…' : 'Escolha um ou mais documentos'}
             opcoes={options}
             valor={selectedIds}
@@ -340,41 +377,76 @@ export function ChatPage() {
                 />
               }
             >
-              {messages.map((m, index) =>
-                m.role === 'user' ? (
-                  <Mensagem key={m.id} autor="usuario" nome="Você" hora={m.createdAt}>
-                    {m.content}
-                  </Mensagem>
-                ) : (
+              {messages.map((m, index) => {
+                if (m.role === 'user') {
+                  return (
+                    <Mensagem key={m.id} autor="usuario" nome="Você" hora={m.createdAt}>
+                      {m.content}
+                    </Mensagem>
+                  );
+                }
+                const isWeb = m.answerKind === 'web';
+                // Só a última resposta oferece a busca, e nunca durante a geração.
+                const canSearchWeb =
+                  index === messages.length - 1 && m.state === 'concluida' && !isWeb && !!selectedIds.length;
+                const offerProminently = canSearchWeb && m.answerKind === 'not_found';
+                return (
                   <Mensagem
                     key={m.id}
                     autor="assistente"
-                    nome="Celke IA"
+                    nome={isWeb ? 'Celke IA · Resposta da internet' : 'Celke IA'}
                     avatar={<span className="app-avatar-ia" aria-hidden="true">IA</span>}
                     estado={m.state}
                     erro={m.error}
                     aoTentarNovamente={index === messages.length - 1 ? () => retry(m) : undefined}
                     copiavel
-                    rodape={
-                      m.sources?.length ? (
-                        <Referencias
-                          itens={m.sources.map((s, i) => ({
-                            id: `${s.document_id}-${i}`,
-                            titulo: `[${i + 1}] ${s.filename}`,
-                            detalhe: `Página ${s.page}`,
-                            trecho: s.excerpt,
-                          }))}
+                    acoes={
+                      canSearchWeb && !offerProminently ? (
+                        <Botao
+                          rotulo="Pesquisar na internet"
+                          icone="globe"
+                          tamanho="pequeno"
+                          severidade="secundario"
+                          title={WEB_SEARCH_NOTICE}
+                          onClick={() => searchWeb(index)}
                         />
+                      ) : undefined
+                    }
+                    rodape={
+                      m.sources?.length || offerProminently ? (
+                        <>
+                          {m.sources?.length ? <Referencias itens={m.sources.map(toReference)} /> : null}
+                          {offerProminently && (
+                            <Alerta
+                              severidade="info"
+                              titulo="Os documentos não têm essa resposta"
+                              mensagem={WEB_SEARCH_NOTICE}
+                              posicaoAcoes="abaixo"
+                              acoes={
+                                <Botao
+                                  rotulo="Pesquisar na internet"
+                                  icone="globe"
+                                  tamanho="pequeno"
+                                  onClick={() => searchWeb(index)}
+                                />
+                              }
+                            />
+                          )}
+                        </>
                       ) : undefined
                     }
                   >
                     {m.content ||
-                      (m.state === 'gerando' && m.thinking ? (
-                        <span className="app-pensando">Analisando os trechos dos documentos…</span>
+                      (m.state === 'gerando' && m.searching ? (
+                        <span className="app-pensando">Pesquisando na internet…</span>
+                      ) : m.state === 'gerando' && m.thinking ? (
+                        <span className="app-pensando">
+                          {isWeb ? 'Analisando os resultados da internet…' : 'Analisando os trechos dos documentos…'}
+                        </span>
                       ) : undefined)}
                   </Mensagem>
-                ),
-              )}
+                );
+              })}
             </Conversa>
           </div>
         </>

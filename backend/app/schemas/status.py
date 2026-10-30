@@ -27,6 +27,7 @@ class SystemStatus(BaseModel):
     ollama: OllamaStatus
     vector_store: ServiceStatus
     database: ServiceStatus
+    web_search: ServiceStatus
 
 
 class InstalledModel(BaseModel):

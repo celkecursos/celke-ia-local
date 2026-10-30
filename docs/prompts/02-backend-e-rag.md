@@ -252,6 +252,34 @@ entre aspas, porque têm `: `), `OLLAMA_URL: http://ollama:11434`, `CHROMA_HOST:
   `POSTGRES_HOST: postgres-test`, `POSTGRES_DB: celke_ia_local_test`, `POSTGRES_USER: celke`,
   `INTEGRATION_API_URL: http://backend:8000/api`, `depends_on` com `postgres-test` saudável).
 
+## Busca na internet
+
+A busca é opcional e só acontece quando a pessoa pede (`web_search: true` em `POST /chat`).
+
+- No `compose.yaml`, serviço `searxng` (imagem `searxng/searxng` com tag de data fixa, `SEARXNG_SECRET:
+  ${SEARXNG_SECRET:-}`, `SEARXNG_BASE_URL: http://searxng:8080/`, `FORCE_OWNERSHIP: "false"`, volume
+  `./searxng/settings.yml:/etc/searxng/settings.yml:ro`, healthcheck com `wget` em `/healthz`, **sem**
+  `ports`). O backend não depende dele para subir. `searxng/settings.yml`: `use_default_settings` com
+  `keep_only` de `duckduckgo`, `brave`, `mojeek` e `wikipedia`, `formats: [html, json]`, `limiter: false`,
+  `image_proxy: false`, `enable_metrics: false`.
+- Variáveis `SEARXNG_URL`, `WEB_SEARCH_TIMEOUT_SECONDS` (15), `WEB_SEARCH_MAX_RESULTS` (3) e
+  `WEB_PAGE_MAX_CHARS` (2000). `.env.example` com `SEARXNG_SECRET=` vazio.
+- `app/services/web_search.py`: `SearxngSearch` com `ping()` (`/healthz`) e `search(query)` (`/search` com
+  `format=json`), que lê as páginas em paralelo com `httpx` e extrai o texto com `trafilatura`; falhou ou
+  veio sem texto, usa o resumo do buscador. Segurança: só http(s) nas portas 80 e 443; todos os IPs do
+  host precisam ser públicos (`is_global`); conecta no IP conferido, com `Host` e `sni_hostname` do site;
+  no máximo 3 redirecionamentos, conferindo cada um; limite de tamanho e de tempo. Falha do SearXNG vira
+  `WebSearchUnavailableError` (503, `busca_indisponivel`).
+- `RagService`: com `web_search`, emite `searching`, depois `sources` com `kind: "web"`, `url` e o título
+  em `filename`. O contexto vai em `<resultados_web>`, com um prompt de sistema próprio que o trata como
+  dado não confiável, sem os PDFs e sem o histórico. Sem resultados, responde que a busca não trouxe nada
+  sem chamar o modelo.
+- O prompt de documentos manda responder exatamente com a frase de "não encontrei". Se o começo da resposta
+  contiver "não encontr", emita `not_found` antes do `done`. Coluna `messages.answer_kind` (`documents`,
+  `not_found` ou `web`), criada com `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. `/status` ganha `web_search`.
+- Testes em `tests/unit/test_web_search.py`: só quando pedida, endereços internos e redirecionamentos
+  bloqueados, fontes web, `not_found`, erro e nova tentativa.
+
 ## Testes unitários (sem Ollama)
 
 `tests/fakes.py`: `FakeModel` (embeddings determinísticos por saco de palavras com hash em 64
