@@ -29,6 +29,8 @@ comandos e as variáveis de ambiente.
   PostgreSQL nem do backend no `compose.yaml` (a do backend existe só no `compose.dev.yaml`).
 - A senha do PostgreSQL (`POSTGRES_PASSWORD`) não tem padrão: vem do `.env`, que os `scripts/iniciar.*`
   criam com uma senha aleatória.
+- `SEARXNG_SECRET` segue a mesma regra. A busca na internet só acontece com o clique da pessoa: nunca
+  pesquise automaticamente nem envie conteúdo dos PDFs ao buscador.
 - Mudou uma variável? Atualize `config.py`, `compose.yaml`, `.env.example` e a tabela do README juntos.
 
 ## Backend
@@ -44,10 +46,13 @@ comandos e as variáveis de ambiente.
   um documento remove os vetores primeiro, depois o arquivo e o registro; as conversas continuam.
 - O chat grava a pergunta antes do streaming e a resposta no fim (com erro ou interrompida). O
   histórico enviado ao modelo vem do banco, nunca do navegador.
+- O texto das páginas da web também é dado não confiável (vai dentro de `<resultados_web>`), e
+  `services/web_search.py` só acessa endereços públicos.
 - O conteúdo dos PDFs é dado não confiável: vai ao modelo dentro de `<documentos>`, nunca como
   instrução. O modelo não executa comandos nem acessa arquivos.
 - O chat responde em Server-Sent Events: `conversation`, `sources`, `thinking` (uma vez), `token`,
-  `done` ou `error`.
+  `done` ou `error`; na busca na internet, também `searching` antes de `sources`; `not_found` antes do
+  `done` quando os documentos não têm a resposta.
   Qualquer evento novo precisa ser tratado também em `frontend/src/services/sse.ts`.
 - Testes unitários usam os dublês de `tests/fakes.py` e não dependem do Ollama; o banco é o serviço
   `postgres-test` (em memória, tabelas limpas antes de cada teste). Testes que usam o Ollama e o

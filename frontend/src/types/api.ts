@@ -42,6 +42,7 @@ export interface SystemStatus {
   };
   vector_store: ServiceStatus;
   database: ServiceStatus;
+  web_search: ServiceStatus;
 }
 
 export interface ChatDocument {
@@ -51,12 +52,18 @@ export interface ChatDocument {
 }
 
 export interface Source {
-  document_id: string;
+  kind?: 'document' | 'web';
+  document_id?: string | null;
+  /** Na web, é o título da página. */
   filename: string;
-  page: number;
+  page?: number | null;
+  url?: string | null;
   excerpt: string;
-  score: number;
+  score?: number | null;
 }
+
+/** documents = veio dos PDFs; not_found = os PDFs não tinham a resposta; web = veio da busca na internet. */
+export type AnswerKind = 'documents' | 'not_found' | 'web';
 
 export interface ChatRequest {
   question: string;
@@ -65,6 +72,8 @@ export interface ChatRequest {
   conversation_id?: string;
   /** Gera de novo a última resposta da conversa, que terminou em erro. */
   retry?: boolean;
+  /** Responde com a busca na internet. Só a pergunta sai do computador. */
+  web_search?: boolean;
 }
 
 export interface StoredMessage {
@@ -74,6 +83,7 @@ export interface StoredMessage {
   state: 'concluida' | 'erro';
   error_message: string | null;
   sources: Source[];
+  answer_kind: AnswerKind;
   created_at: string;
 }
 
@@ -92,8 +102,10 @@ export interface ConversationDetail extends Conversation {
 /** Eventos do POST /api/chat (Server-Sent Events). */
 export type ChatEvent =
   | { type: 'conversation'; id: string; title: string }
+  | { type: 'searching' }
   | { type: 'sources'; sources: Source[] }
   | { type: 'thinking' }
   | { type: 'token'; text: string }
+  | { type: 'not_found' }
   | { type: 'done' }
   | { type: 'error'; code: string; message: string };

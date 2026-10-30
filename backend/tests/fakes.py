@@ -12,6 +12,7 @@ import pymupdf
 from app.core.errors import AppError
 from app.repositories.vector_store import ChunkRecord, SearchHit
 from app.services.ollama_service import ChatChunk
+from app.services.web_search import WebResult
 
 DIMENSION = 64
 
@@ -45,7 +46,7 @@ class FakeModel:
             raise self.chat_error
         yield ChatChunk("thinking", "Vou procurar ")
         yield ChatChunk("thinking", "nos trechos.")
-        for word in self.answer.split(" "):
+        for word in re.findall(r"\S+\s*", self.answer):
             yield ChatChunk("content", word)
 
 
@@ -79,6 +80,23 @@ class InMemoryVectorStore:
         if self.fail:
             raise self.fail
         self.chunks = {k: v for k, v in self.chunks.items() if v.document_id != document_id}
+
+
+class FakeWebSearch:
+    def __init__(self):
+        self.results = [WebResult("Página de teste", "https://exemplo.com.br/pagina", "A capital da França é Paris.")]
+        self.queries: list[str] = []
+        self.error: AppError | None = None
+
+    def ping(self) -> None:
+        if self.error:
+            raise self.error
+
+    def search(self, query: str) -> list[WebResult]:
+        self.queries.append(query)
+        if self.error:
+            raise self.error
+        return self.results
 
 
 class ImmediateExecutor(Executor):

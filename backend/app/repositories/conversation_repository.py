@@ -4,9 +4,9 @@ from psycopg.types.json import Jsonb
 
 from app.repositories.database import Database
 from app.schemas.chat import Source
-from app.schemas.conversations import Conversation, Message, MessageRole, MessageState
+from app.schemas.conversations import AnswerKind, Conversation, Message, MessageRole, MessageState
 
-_MESSAGE_COLUMNS = "id, role, content, state, error_message, sources, created_at"
+_MESSAGE_COLUMNS = "id, role, content, state, error_message, sources, answer_kind, created_at"
 
 
 class ConversationRepository:
@@ -62,11 +62,12 @@ class ConversationRepository:
         state: MessageState = "concluida",
         error_message: str | None = None,
         sources: list[Source] | None = None,
+        answer_kind: AnswerKind = "documents",
     ) -> Message:
         with self._db.connection() as conn:
             row = conn.execute(
-                "INSERT INTO messages (id, conversation_id, role, content, state, error_message, sources)"
-                f" VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING {_MESSAGE_COLUMNS}",
+                "INSERT INTO messages (id, conversation_id, role, content, state, error_message, sources, answer_kind)"
+                f" VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING {_MESSAGE_COLUMNS}",
                 (
                     uuid.uuid4().hex,
                     conversation_id,
@@ -75,6 +76,7 @@ class ConversationRepository:
                     state,
                     error_message,
                     Jsonb([s.model_dump() for s in sources or []]),
+                    answer_kind,
                 ),
             ).fetchone()
             conn.execute("UPDATE conversations SET updated_at = now() WHERE id = %s", (conversation_id,))

@@ -58,6 +58,11 @@ class DatabaseUnavailableError(AppError):
     code = "banco_de_dados_indisponivel"
 
 
+class WebSearchUnavailableError(AppError):
+    status_code = 503
+    code = "busca_indisponivel"
+
+
 class EmbeddingMismatchError(AppError):
     status_code = 409
     code = "embeddings_incompativeis"

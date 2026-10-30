@@ -1,0 +1,27 @@
+# Busca da opção "Pesquisar na internet". O container não tem porta publicada e só o backend o acessa.
+# A chave secreta vem de SEARXNG_SECRET (no .env, gerada pelos scripts/iniciar.*).
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo
+      - brave
+      - mojeek
+      - wikipedia
+
+general:
+  instance_name: "Celke IA Local"
+  enable_metrics: false
+
+search:
+  safe_search: 1
+  autocomplete: ""
+  default_lang: "pt-BR"
+  formats:
+    - html
+    - json
+
+server:
+  limiter: false
+  image_proxy: false
+  public_instance: false
+  method: "GET"

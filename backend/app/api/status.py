@@ -52,8 +52,18 @@ def system_status(c: ContainerDep) -> SystemStatus:
         database = ServiceStatus(online=True)
     except AppError as exc:
         database = ServiceStatus(online=False, error=exc.message)
+    try:
+        # Só confere o container local: nada sai para a internet aqui.
+        c.web_search.ping()
+        web_search = ServiceStatus(online=True)
+    except AppError as exc:
+        web_search = ServiceStatus(online=False, error=exc.message)
     return SystemStatus(
-        backend=ServiceStatus(online=True), ollama=_ollama_status(c), vector_store=vector, database=database
+        backend=ServiceStatus(online=True),
+        ollama=_ollama_status(c),
+        vector_store=vector,
+        database=database,
+        web_search=web_search,
     )
 
 

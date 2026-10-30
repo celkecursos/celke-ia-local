@@ -103,6 +103,10 @@ export function StatusPage() {
               <span>PostgreSQL (documentos e conversas)</span>
               <OnlineStatus online={!!s?.database.online} rotulo={s ? undefined : 'Verificando'} />
             </li>
+            <li>
+              <span>SearXNG (busca na internet, só quando você pede)</span>
+              <OnlineStatus online={!!s?.web_search.online} rotulo={s ? undefined : 'Verificando'} />
+            </li>
           </ul>
         )}
       </Card>

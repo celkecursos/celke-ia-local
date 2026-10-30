@@ -48,6 +48,10 @@ services:
       CHUNK_OVERLAP: ${CHUNK_OVERLAP:-200}
       RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K:-5}
       HISTORY_MAX_MESSAGES: ${HISTORY_MAX_MESSAGES:-6}
+      SEARXNG_URL: http://searxng:8080
+      WEB_SEARCH_TIMEOUT_SECONDS: ${WEB_SEARCH_TIMEOUT_SECONDS:-15}
+      WEB_SEARCH_MAX_RESULTS: ${WEB_SEARCH_MAX_RESULTS:-3}
+      WEB_PAGE_MAX_CHARS: ${WEB_PAGE_MAX_CHARS:-2000}
     volumes:
       - app-data:/data
     depends_on:
@@ -108,6 +112,24 @@ services:
       interval: 10s
       timeout: 5s
       start_period: 10s
+      retries: 10
+    restart: unless-stopped
+
+  # Busca da opção "Pesquisar na internet": só pesquisa quando a pessoa clica. O backend não depende dele
+  # para subir: sem o SearXNG, o chat com os documentos continua funcionando.
+  searxng:
+    image: searxng/searxng:2026.10.30-1cd13d98d
+    environment:
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-}
+      SEARXNG_BASE_URL: http://searxng:8080/
+      FORCE_OWNERSHIP: "false"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
       retries: 10
     restart: unless-stopped
 

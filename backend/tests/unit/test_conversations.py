@@ -146,7 +146,7 @@ def test_stopped_answer_keeps_what_arrived(client, sample_pdf, container):
     stream.close()  # o navegador fechou a conexão
 
     answer = container.conversations.get(turn.conversation.id).messages[-1]
-    assert (answer.role, answer.state, answer.content) == ("assistant", "concluida", "Resposta")
+    assert (answer.role, answer.state, answer.content) == ("assistant", "concluida", "Resposta ")
 
 
 def test_stopped_before_any_text(client, sample_pdf, container):

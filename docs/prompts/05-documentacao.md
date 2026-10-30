@@ -21,7 +21,7 @@ no código.
      (`git clone <url-do-repositório> celke-ia-local`), `.env` opcional (Linux/macOS e Windows; os
      scripts criam a senha do PostgreSQL e o arquivo precisa ser guardado),
      `./scripts/iniciar.sh` ou `scripts\iniciar.ps1`, a alternativa com
-     `docker compose up -d --build` (exige `POSTGRES_PASSWORD` no `.env`) +
+     `docker compose up -d --build` (exige `POSTGRES_PASSWORD` e `SEARXNG_SECRET` no `.env`) +
      `docker compose logs -f ollama-init`, tabela de endereços
      (aplicação, `/api/docs`, `/api/health`) e como parar;
    - **Usar a aplicação**: passo a passo no navegador (inclusive a lista de conversas) e exemplos com
@@ -48,6 +48,8 @@ no código.
      e, no Windows, o limite de memória no `.wslconfig` e a porta reservada pelo sistema;
    - **Hardware e limitações**: velocidade em CPU e com GPU, o raciocínio do `qwen3:4b`, sem OCR,
      só a última resposta com erro pode ser gerada de novo, um PDF processado por vez;
+   - **Busca na internet**, nas seções acima e em **Segurança**: só com o clique, só a pergunta sai do
+     computador, buscadores usados e bloqueio de endereços internos;
    - **Segurança**: uso local, sem login, não publicar na internet como está; portas; `APP_BIND`;
      senha do PostgreSQL só no `.env`;
      arquivos com nome interno; PDF como dado não confiável; CORS desligado; usuário sem privilégios;

@@ -55,7 +55,7 @@ com título "Celke IA Local" e um `public/logo.svg` simples (balão de conversa)
 
 ```
 src/main.tsx               importa '@celke/kole-react/estilos.css' e './styles.css'; registra os
-                           ícones activity, bot, cpu, database e server do lucide-react com registrarIcones;
+                           ícones activity, bot, cpu, database, globe e server do lucide-react com registrarIcones;
                            <ProvedorUi><RouterProvider router={router} /></ProvedorUi>
 src/router.tsx             createBrowserRouter: layout com '/' (chat), '/documentos', '/status', '/chat' (redireciona para '/', mantendo a query string) e '*'
 src/layouts/AppLayout.tsx  Estrutura com marca "Celke IA Local" / "Chat com seus PDFs", menu Chat
@@ -84,7 +84,7 @@ entre cabeçalho, alertas, indicadores e cards é sempre o mesmo. O contêiner d
   servidor.".
 - `streamChat(body, signal)`: `fetch` POST com `Accept: text/event-stream` e o `AbortSignal`; erro HTTP
   vira `ApiError`; o corpo é lido por `readSse`, que junta blocos partidos entre pedaços, aceita
-  `\r\n` e entrega `conversation` (`id`, `title`), `sources`, `thinking`, `token`, `done` e `error`
+  `\r\n` e entrega `conversation` (`id`, `title`), `searching`, `sources`, `thinking`, `token`, `not_found`, `done` e `error`
   (com `codigo`/`mensagem` → `code`/`message`). Abortado pelo usuário encerra sem erro.
 - `api.conversations()`, `api.conversation(id)` e `api.deleteConversation(id)`.
 
@@ -128,11 +128,19 @@ seleção de documentos ficam sempre visíveis, só as mensagens rolam e o campo
 `conversation_id` da conversa aberta; sem ela, o evento `conversation` traz o id da conversa criada,
 que vai para a URL com `replace` (recarregar continua nela). `aoTentarNovamente` só na **última**
 mensagem: manda `retry: true` com a última pergunta, e o backend refaz a resposta sem repetir a
-pergunta. Enquanto só chegou `thinking`, mostre "Analisando os trechos dos documentos…"; os `token`
+pergunta. Enquanto só chegou `searching`, mostre "Pesquisando na internet…". Enquanto só chegou `thinking`, mostre "Analisando os trechos dos documentos…" (na web, "Analisando os resultados da internet…"); os `token`
 são concatenados no conteúdo. As fontes vão no `rodape` como `Referencias` (título `[n] arquivo`,
 detalhe "Página N", trecho). Parar mantém o que já chegou (ou "Resposta interrompida.") — o backend
 grava o mesmo. O histórico não é enviado: o backend o lê da conversa. Depois de cada resposta, a lista
 de conversas é recarregada.
+
+**Busca na internet:** na última resposta, concluída e que não veio da web: com `not_found` (ou
+`answer_kind: "not_found"` ao reabrir a conversa), `Alerta` `info` no `rodape` com o título "Os documentos
+não têm essa resposta", o texto "Só a pergunta é enviada ao buscador. Os seus PDFs continuam no computador."
+e o botão "Pesquisar na internet" (ícone `globe`); nas outras, o mesmo botão pequeno e secundário em `acoes`.
+O clique repete a pergunta com `web_search: true`. Resposta da web com o nome "Celke IA · Resposta da internet"
+e `Referencias` com `href` e o domínio em `detalhe`. "Tentar novamente" mantém `web_search`. Em Status,
+linha do SearXNG.
 
 **Não encontrada:** `Vazio` com botão para o chat.
 
@@ -157,7 +165,7 @@ saudável) e o `frontend-tests` (`profiles: [test]`, target `test`).
 
 ## Testes
 
-`src/services/sse.test.ts` com Vitest: os seis tipos de evento, evento desconhecido ignorado, blocos
+`src/services/sse.test.ts` com Vitest: os oito tipos de evento, evento desconhecido ignorado, blocos
 partidos entre pedaços, `\r\n` e último bloco sem linha em branco.
 
 ## Verificação

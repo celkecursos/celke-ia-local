@@ -13,6 +13,10 @@ export function parseSseBlock(block: string): ChatEvent | null {
   switch (event) {
     case 'conversation':
       return { type: 'conversation', id: String(payload.id), title: String(payload.title ?? '') };
+    case 'searching':
+      return { type: 'searching' };
+    case 'not_found':
+      return { type: 'not_found' };
     case 'sources':
       return { type: 'sources', sources: payload as Source[] };
     case 'thinking':
