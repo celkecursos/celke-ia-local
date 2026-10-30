@@ -4,6 +4,10 @@ Prompts para criar o **Celke IA Local** do zero com um agente de IA com acesso a
 chatbot com RAG sobre PDFs, modelo de IA rodando no seu computador, backend Python, frontend React com o layout
 `@celke/kole-react` e Docker.
 
+**Esta pasta basta sozinha.** Você não precisa de nenhum outro arquivo do projeto: os prompts trazem o código, o README, a
+licença, o guia para agentes, os scripts e a configuração do Docker. O `package-lock.json` e os segredos do `.env` são gerados
+durante a execução.
+
 ## O que você precisa antes
 
 | O quê | Observação |
@@ -18,7 +22,7 @@ chatbot com RAG sobre PDFs, modelo de IA rodando no seu computador, backend Pyth
 
 ## Como usar
 
-1. Crie uma pasta vazia para o projeto, em qualquer lugar, e coloque esta pasta `prompts-iniciais` dentro dela.
+1. Crie uma pasta vazia para o projeto, em qualquer lugar, e copie só esta pasta `prompts-iniciais` para dentro dela.
 2. Abra o Docker e espere ele iniciar.
 3. Abra o Claude Code na pasta do projeto e execute:
 
@@ -33,7 +37,7 @@ chatbot com RAG sobre PDFs, modelo de IA rodando no seu computador, backend Pyth
 Se parar no meio, execute o mesmo comando numa sessão nova: o andamento fica em `prompts-iniciais/progresso.md`.
 
 Para gravar o tutorial etapa por etapa, execute os prompts da tabela um a um, cada um numa sessão nova, seguindo a
-**Verificação** e o **Depois de executar** de cada um.
+**Verificação** e o **Depois de executar** de cada um. Cada etapa precisa da anterior concluída.
 
 | Ordem | Prompt | Resultado |
 |---|---|---|
@@ -42,7 +46,7 @@ Para gravar o tutorial etapa por etapa, execute os prompts da tabela um a um, ca
 | 2 | [Backend Python e RAG](f02-01-backend-e-rag.md) | API, PDFs, RAG, conversas, busca na internet e testes |
 | 3 | [Frontend React com o Kole](f03-01-frontend-kole.md) | Chat, Documentos e Status |
 | 4 | [Integração ponta a ponta](f04-01-integracao.md) | Fluxo completo com o modelo real e persistência |
-| 5 | [Documentação e entrega](f05-01-documentacao.md) | README, guia para agentes e commit final |
+| 5 | [Documentação e entrega](f05-01-documentacao.md) | README, guia para agentes, prompts em `docs/` e commit final |
 
 ## O que já está decidido
 

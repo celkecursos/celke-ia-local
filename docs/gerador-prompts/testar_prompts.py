@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from gerar_prompts import FILES, REPO, content  # noqa: E402
 
-PROMPTS = REPO / "prompts-iniciais"
+PROMPTS = REPO / "docs" / "prompts-iniciais"
 DEST = Path(tempfile.mkdtemp())
 ORDER = ["f00-01-preparacao-e-modelo.md", "f01-01-estrutura-e-docker.md", "f02-01-backend-e-rag.md",
          "f03-01-frontend-kole.md", "f05-01-documentacao.md"]
@@ -15,7 +15,7 @@ ok = bad = 0
 seen = set()
 for name in ORDER:
     text = (PROMPTS / name).read_text(encoding="utf-8")
-    for path, body in re.findall(r"^`([^`\n]+)`:\n\n``````[a-z]*\n(.*?)^``````$", text, re.M | re.S):
+    for path, body in re.findall(r"^`([^`\n]+)`:\n\n`{6}[a-z]*\n(.*?)^`{6}$", text, re.M | re.S):
         seen.add(path)
         target = DEST / path
         target.parent.mkdir(parents=True, exist_ok=True)

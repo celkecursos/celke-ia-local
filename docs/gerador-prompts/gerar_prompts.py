@@ -1,35 +1,15 @@
 """Gera prompts-iniciais/ com o conteúdo atual dos arquivos do projeto. Ver "Prompts do tutorial" no CLAUDE.md."""
 import os
+import re
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-OUT = REPO / "prompts-iniciais"
-# Fora dos prompts: o que é gerado, local ou só deste repositório.
-SKIP_DIRS = {".git", ".claude", ".pytest_cache", ".ruff_cache", ".venv", "__pycache__", "node_modules", "dist", "docs",
+OUT = REPO / "docs" / "prompts-iniciais"
+# Fora dos prompts: o que é gerado ou só existe neste computador.
+SKIP_DIRS = {".git", ".claude", ".pytest_cache", ".ruff_cache", ".venv", "__pycache__", "node_modules", "dist",
              "prompts-iniciais"}
-SKIP_FILES = {".env", ".DS_Store"}
-# No projeto recriado só existe docs/prompts-iniciais, sem o gerador.
-REPLICA_TEXT = {
-    "README.md": [
-        ("https://github.com/celkecursos/celke-ia-local-rascunho.git", "<url-do-repositório>"),
-        ("""[`prompts-iniciais/`](prompts-iniciais/README.md) tem os prompts que recriam este projeto do zero com um
-agente de IA (Claude Code ou outro com acesso ao terminal), com o conteúdo exato dos arquivos, a escolha do
-modelo pela capacidade do computador e orientações do que fazer em cada etapa.
-[`docs/prompts/`](docs/prompts/README.md) descreve as mesmas etapas em texto, para o tutorial.
-""", """[`docs/prompts-iniciais/`](docs/prompts-iniciais/README.md) tem os prompts que recriam este projeto do zero com
-um agente de IA (Claude Code ou outro com acesso ao terminal), com o conteúdo exato dos arquivos, a escolha do
-modelo pela capacidade do computador e orientações do que fazer em cada etapa.
-"""),
-    ],
-    "CLAUDE.md": [
-        ("""| `prompts-iniciais/` | Prompts que recriam o projeto do zero, com o conteúdo exato dos arquivos (gerados) | Markdown |
-| `docs/prompts/` | As mesmas etapas descritas em texto, para o tutorial | Markdown |
-| `docs/gerador-prompts/` | Gera e confere `prompts-iniciais/` | Python |
-""", """| `docs/prompts-iniciais/` | Prompts usados para criar o projeto do zero | Markdown |
-"""),
-    ],
-}
-FENCE = "``````"
+SKIP_FILES = {".env", ".DS_Store", "configuracao.md", "progresso.md"}
+FENCE = "`" * 6
 LANG = {".py": "python", ".ts": "ts", ".tsx": "tsx", ".css": "css", ".json": "json", ".yaml": "yaml", ".yml": "yaml",
         ".md": "markdown", ".sh": "sh", ".ps1": "powershell", ".html": "html", ".svg": "xml", ".toml": "toml",
         ".txt": "text", ".template": "nginx"}
@@ -48,14 +28,11 @@ FILES = project_files()
 
 def content(path):
     text = (REPO / path).read_bytes().decode("utf-8").replace("\r\n", "\n")
-    for old, new in REPLICA_TEXT.get(path, []):
-        assert old in text, (path, old)
-        text = text.replace(old, new)
-    if path == "CLAUDE.md":
-        head, _, _ = text.partition("`prompts-iniciais/` é gerado:")
-        text = head.rstrip("\n").replace("`docs/prompts/` recria", "`docs/prompts-iniciais/` recria") + "\n"
+    # Valores de quem gerou viram marcadores, trocados por quem recria.
+    if path == "README.md":
+        text = re.sub(r"git clone \S+ celke-ia-local", "git clone <url-do-repositório> celke-ia-local", text)
     if path == "LICENSE.txt":
-        text = text.replace("Copyright (c) 2026 Cesar Szpak", "Copyright (c) <ano> <titular-da-licenca>")
+        text = re.sub(r"Copyright \(c\) .*", "Copyright (c) <ano> <titular-da-licenca>", text, count=1)
     assert FENCE not in text, path
     return text
 
@@ -83,7 +60,7 @@ ROOT = [".gitignore", ".gitattributes", ".dockerignore", ".env.example", "compos
         "compose.dev.yaml", "searxng/settings.yml", "scripts/iniciar.sh", "scripts/iniciar.ps1"]
 BACKEND = [f for f in FILES if f.startswith("backend/")]
 FRONTEND = [f for f in FILES if f.startswith("frontend/") and f != "frontend/package-lock.json"]
-DOCS = ["README.md", "CLAUDE.md"]
+DOCS = ["README.md", "CLAUDE.md"] + [f for f in FILES if f.startswith("docs/")]
 accounted = set(ROOT + BACKEND + FRONTEND + DOCS + ["LICENSE.txt", "frontend/package-lock.json"])
 assert set(FILES) == accounted, set(FILES) ^ accounted
 
@@ -488,13 +465,16 @@ F05 = f"""# Documentação e entrega
 
 ## Prompt
 
-Crie a documentação do **Celke IA Local**, copie os prompts para o projeto e crie a branch de homologação.
+Crie a documentação do **Celke IA Local**, deixe os prompts no projeto e crie a branch de homologação. Os arquivos de
+`docs/prompts` são os mesmos passos em texto, para o tutorial, e `docs/gerador-prompts` mantém estes prompts atualizados:
+crie-os como estão, sem executá-los.
 
 {RULES}
 Troque `<url-do-repositório>` no `README.md` pela URL do `origin`, se houver. Sem `origin`, mantenha o marcador.
 
 {blocks(DOCS)}
-Copie a pasta de prompts para `docs/prompts-iniciais/`, sem o `progresso.md`.
+Por fim, se a pasta de prompts não for `docs/prompts-iniciais/`, copie-a para lá, sem o `progresso.md`. Se esse caminho
+estiver em `.git/info/exclude`, troque a linha por `/docs/prompts-iniciais/progresso.md`.
 
 ## Verificação
 
@@ -509,8 +489,8 @@ Confira que os links internos do README existem (`.env.example`, `LICENSE.txt`, 
 ## Depois de executar
 
 ```bash
-git add README.md CLAUDE.md docs/prompts-iniciais
-git commit -m "docs: adiciona o README, o guia para agentes e os prompts iniciais"
+git add README.md CLAUDE.md docs
+git commit -m "docs: adiciona o README, o guia para agentes e os prompts"
 git branch homolog
 ```
 
@@ -544,6 +524,10 @@ Prompts para criar o **Celke IA Local** do zero com um agente de IA com acesso a
 chatbot com RAG sobre PDFs, modelo de IA rodando no seu computador, backend Python, frontend React com o layout
 `@celke/kole-react` e Docker.
 
+**Esta pasta basta sozinha.** Você não precisa de nenhum outro arquivo do projeto: os prompts trazem o código, o README, a
+licença, o guia para agentes, os scripts e a configuração do Docker. O `package-lock.json` e os segredos do `.env` são gerados
+durante a execução.
+
 ## O que você precisa antes
 
 | O quê | Observação |
@@ -558,7 +542,7 @@ chatbot com RAG sobre PDFs, modelo de IA rodando no seu computador, backend Pyth
 
 ## Como usar
 
-1. Crie uma pasta vazia para o projeto, em qualquer lugar, e coloque esta pasta `prompts-iniciais` dentro dela.
+1. Crie uma pasta vazia para o projeto, em qualquer lugar, e copie só esta pasta `prompts-iniciais` para dentro dela.
 2. Abra o Docker e espere ele iniciar.
 3. Abra o Claude Code na pasta do projeto e execute:
 
@@ -573,7 +557,7 @@ chatbot com RAG sobre PDFs, modelo de IA rodando no seu computador, backend Pyth
 Se parar no meio, execute o mesmo comando numa sessão nova: o andamento fica em `prompts-iniciais/progresso.md`.
 
 Para gravar o tutorial etapa por etapa, execute os prompts da tabela um a um, cada um numa sessão nova, seguindo a
-**Verificação** e o **Depois de executar** de cada um.
+**Verificação** e o **Depois de executar** de cada um. Cada etapa precisa da anterior concluída.
 
 | Ordem | Prompt | Resultado |
 |---|---|---|
@@ -582,7 +566,7 @@ Para gravar o tutorial etapa por etapa, execute os prompts da tabela um a um, ca
 | 2 | [Backend Python e RAG](f02-01-backend-e-rag.md) | API, PDFs, RAG, conversas, busca na internet e testes |
 | 3 | [Frontend React com o Kole](f03-01-frontend-kole.md) | Chat, Documentos e Status |
 | 4 | [Integração ponta a ponta](f04-01-integracao.md) | Fluxo completo com o modelo real e persistência |
-| 5 | [Documentação e entrega](f05-01-documentacao.md) | README, guia para agentes e commit final |
+| 5 | [Documentação e entrega](f05-01-documentacao.md) | README, guia para agentes, prompts em `docs/` e commit final |
 
 ## O que já está decidido
 
