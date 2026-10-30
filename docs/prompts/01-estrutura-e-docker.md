@@ -62,11 +62,14 @@ ChromaDB e PostgreSQL). Backend e frontend entram nas etapas 2 e 3.
 
 3. Crie `compose.gpu.yaml` (override que reserva GPU NVIDIA para o `ollama` com
    `deploy.resources.reservations.devices`, `driver: nvidia`, `count: all`, `capabilities: [gpu]`,
-   comentando que exige o NVIDIA Container Toolkit no Linux ou WSL2) e `compose.dev.yaml` (override que
+   comentando que no Windows basta o driver NVIDIA com o Docker Desktop em WSL2 e que no Linux exige o
+   NVIDIA Container Toolkit) e `compose.dev.yaml` (override que
    publica `127.0.0.1:8000:8000` no `backend`, para o Vite em desenvolvimento).
 
 4. Crie o `.env.example` comentado, em português, com: `APP_PORT=8090`, `APP_BIND=127.0.0.1`
-   (explicando que `0.0.0.0` abre para a rede local sem login), `POSTGRES_PASSWORD=` vazio
+   (explicando que `0.0.0.0` abre para a rede local sem login), `COMPOSE_FILE` comentado nas duas
+   formas (`compose.yaml;compose.gpu.yaml` no Windows, `compose.yaml:compose.gpu.yaml` no Linux, para
+   ligar a GPU NVIDIA), `POSTGRES_PASSWORD=` vazio
    (obrigatória; os scripts da etapa 4 geram uma aleatória; vale só na criação do volume),
    `POSTGRES_DB=celke_ia_local`, `POSTGRES_USER=celke`, `CHAT_MODEL=qwen3:4b`,
    `EMBEDDING_MODEL=nomic-embed-text`, `EMBEDDING_DOCUMENT_PREFIX="search_document: "`,
@@ -78,7 +81,8 @@ ChromaDB e PostgreSQL). Backend e frontend entram nas etapas 2 e 3.
 
 5. Crie `.gitignore` (`.env`, `node_modules/`, `dist/`, `__pycache__/`, `*.pyc`, `.pytest_cache/`,
    `.ruff_cache/`, `.venv/`, `*.log`, `.DS_Store`) e `.dockerignore` na raiz (`.git`, `.env`,
-   `**/node_modules`, `**/dist`, `**/__pycache__`, `docs`).
+   `**/node_modules`, `**/dist`, `**/__pycache__`, `docs`). Crie também `.gitattributes` com
+   `*.sh text eol=lf`, porque em clones no Windows o `sh` não executa scripts com CRLF.
 
 6. Crie `LICENSE.txt` com a licença MIT, perguntando o titular se não houver `git config user.name`.
 

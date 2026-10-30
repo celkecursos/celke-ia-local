@@ -25,9 +25,12 @@ completo: envio, indexação, pergunta, fontes, exclusão e persistência depois
    - mostra o endereço da aplicação, o do Swagger (`/api/docs`) e os comandos de logs e de parar.
 
 2. **`scripts/iniciar.ps1`** (Windows PowerShell) com o mesmo fluxo e as mesmas mensagens, sem acentos
-   (o console do Windows pode não exibi-los). A senha vem de
-   `[System.Security.Cryptography.RandomNumberGenerator]` e o `.env` é gravado com
-   `[System.IO.File]::WriteAllLines` (UTF-8 sem BOM, que o Docker Compose lê). Uso:
+   (o console do Windows pode não exibi-los). Use `$ErrorActionPreference = 'Continue'` e confira as
+   falhas pelo `$LASTEXITCODE`: no PowerShell 5.1, com `Stop`, um aviso do Docker no stderr vira erro
+   fatal em `docker info *> $null`. A senha vem de
+   `[System.Security.Cryptography.RandomNumberGenerator]`, o `.env` é lido com
+   `Get-Content -Encoding UTF8` e gravado com `[System.IO.File]::WriteAllLines` (UTF-8 sem BOM, que o
+   Docker Compose lê). Uso:
    `powershell -ExecutionPolicy Bypass -File scripts\iniciar.ps1`.
 
 3. **`backend/tests/integration/test_full_flow.py`** com `pytestmark = pytest.mark.integration`, usando

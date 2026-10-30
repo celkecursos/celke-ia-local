@@ -1,4 +1,5 @@
-# GPU NVIDIA no Linux ou no Windows (WSL2). Requer o NVIDIA Container Toolkit.
+# GPU NVIDIA. Windows: basta o driver NVIDIA e o Docker Desktop com WSL2. Linux: requer o NVIDIA
+# Container Toolkit. Para valer sempre, use COMPOSE_FILE no .env (ver .env.example).
 # docker compose -f compose.yaml -f compose.gpu.yaml up -d
 services:
   ollama:
