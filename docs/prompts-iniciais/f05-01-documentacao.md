@@ -1785,7 +1785,7 @@ serve o build e repassa `/api` ao backend, então o navegador só fala com uma o
 
 ```json
 "dependencies": {
-  "@celke/kole-react": "^0.1.0",
+  "@celke/kole-react": "^0.2.0",
   "lucide-react": "^1.60.0",
   "react": "^19.3.1",
   "react-dom": "^19.3.1",
@@ -1810,7 +1810,9 @@ Scripts: `dev` (`vite`), `build` (`tsc --noEmit && vite build`), `typecheck` (`t
 `vite.config.ts` (com `/// <reference types="vitest/config" />`): plugin React,
 `resolve.dedupe: ['react', 'react-dom']`, proxy de `/api` para `process.env.VITE_API_PROXY ??
 'http://localhost:8000'` em desenvolvimento e `test.environment: 'node'`. `index.html` em `pt-BR`
-com título "Celke IA Local" e um `public/logo.svg` simples (balão de conversa).
+com título "Celke IA Local", um `public/logo.svg` simples (balão de conversa) e, no `<head>`, um
+`<script>` inline com a saída de `scriptTemaInicial()` da `@celke/kole-react`, que aplica o tema e a
+densidade salvos antes da primeira pintura (sem o clarão de quem usa o tema escuro).
 
 ## Organização
 
