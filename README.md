@@ -107,7 +107,6 @@ entre `<resultados_web>`, sem os PDFs e sem o histórico → modelo de chat → 
 
 - **Docker** com o **Docker Compose**: Docker Desktop (Windows e macOS) ou Docker Engine com o plugin
   Compose (Linux).
-- **Git** para clonar (ou baixe o ZIP pelo GitHub).
 - **Memória:** 8 GB de RAM livres para o Docker (o `qwen3:4b` usa cerca de 4 GB). No macOS, ajuste em
   *Settings → Resources* do Docker Desktop. No Windows com WSL2, o Docker usa por padrão metade da RAM
   e o limite fica no arquivo `.wslconfig` (veja [Problemas comuns](#problemas-comuns)).
@@ -119,12 +118,17 @@ entre `<resultados_web>`, sem os PDFs e sem o histórico → modelo de chat → 
 
 ## Executar com Docker
 
-**1. Clonar o repositório**
+**1. Baixar e extrair o projeto**
+
+Extraia o arquivo baixado em uma pasta de sua escolha e abra um terminal dentro da pasta extraída, a que
+tem o arquivo `compose.yaml`. Se a extração criar uma pasta dentro da outra, entre na mais interna.
 
 ```bash
-git clone https://github.com/celkecursos/celke-ia-local-rascunho.git celke-ia-local
-cd celke-ia-local
+cd caminho/para/celke-ia-local
 ```
+
+No Windows, antes de continuar, abra o Docker Desktop e espere ele terminar de iniciar. Use o PowerShell
+como terminal.
 
 **2. (Opcional) Criar o `.env`** para mudar porta, modelos ou limites. Sem ele, valem os padrões, e os
 scripts do passo 3 criam o arquivo com uma senha aleatória para o PostgreSQL (`POSTGRES_PASSWORD`).
@@ -142,7 +146,7 @@ Guarde o `.env`: o PostgreSQL grava a senha na primeira subida, e uma senha nova
 Linux e macOS:
 
 ```bash
-./scripts/iniciar.sh
+sh scripts/iniciar.sh
 ```
 
 Windows (PowerShell):
@@ -353,9 +357,14 @@ do `/data/app.db` (os vetores no ChromaDB continuam valendo) e renomeia o arquiv
 
 ## Atualizar o projeto
 
+1. Baixe e extraia a versão nova em outra pasta.
+2. Copie o arquivo `.env` da pasta antiga para a pasta nova. Sem ele, o script cria uma senha nova, que
+   não abre o banco existente.
+3. Na pasta nova, rode o script. Ele reconstrói as imagens e mantém os dados, que ficam nos volumes do
+   Docker, e não na pasta do projeto.
+
 ```bash
-git pull
-./scripts/iniciar.sh         # reconstrói as imagens e mantém os dados
+sh scripts/iniciar.sh
 # Windows: powershell -ExecutionPolicy Bypass -File scripts\iniciar.ps1
 ```
 
