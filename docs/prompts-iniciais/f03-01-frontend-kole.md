@@ -66,6 +66,8 @@ HEALTHCHECK --interval=10s --timeout=3s --retries=5 CMD wget -q -O /dev/null htt
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <title>Celke IA Local</title>
+    <!-- tema e densidade antes da primeira pintura: scriptTemaInicial() da @celke/kole-react -->
+    <script>(function(){var p={};try{p=JSON.parse(localStorage.getItem("lp-preferencias")||"{}")||{}}catch(e){}var t=p.tema||"sistema";var h=document.documentElement;h.setAttribute("data-theme",{"claro":"light","escuro":"dark","sistema":"system"}[t]||"light");var d={"compacta":"density-compact","confortavel":"density-comfortable","espacosa":"density-cozy"}[p.densidade||"confortavel"];if(d)h.classList.add(d)})();</script>
   </head>
   <body>
     <div id="root"></div>
@@ -138,7 +140,7 @@ server {
     "preview": "vite preview"
   },
   "dependencies": {
-    "@celke/kole-react": "^0.1.0",
+    "@celke/kole-react": "^0.2.0",
     "lucide-react": "^1.60.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
